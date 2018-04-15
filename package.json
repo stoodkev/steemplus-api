@@ -1,0 +1,31 @@
+{
+  "name": "steemplus-api",
+  "version": "1.0.0",
+  "description": "API for SteemPlus",
+  "main": "app.js",
+  "dependencies": {
+    "body-parser": "^1.18.2",
+    "dotenv": "^5.0.1",
+    "express": "^4.16.3",
+    "mssql": "^4.1.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "start": "node app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/steemplus/steemplus-api.git"
+  },
+  "keywords": [
+    "steemplus",
+    "api"
+  ],
+  "author": "stoodkev",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/steemplus/steemplus-api/issues"
+  },
+  "homepage": "https://github.com/steemplus/steemplus-api#readme"
+}
