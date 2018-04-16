@@ -50,7 +50,7 @@ app.get("/api/get-witnesses-rank", function(req, res){
     return pool.request()
     .query('Select Witnesses.name, rank\
   from Witnesses (NOLOCK)\
-  LEFT JOIN (SELECT ROW_NUMBER() OVER (ORDER BY (SELECT votes) DESC) AS rank, * FROM Witnesses (NOLOCK) WHERE signing_key != 'STM1111111111111111111111111111111114T1Anm') AS rankedTable ON Witnesses.name = rankedTable.name;')
+  LEFT JOIN (SELECT ROW_NUMBER() OVER (ORDER BY (SELECT votes) DESC) AS rank, * FROM Witnesses (NOLOCK) WHERE signing_key != \'STM1111111111111111111111111111111114T1Anm\') AS rankedTable ON Witnesses.name = rankedTable.name;')
   }).then(result => {
     res.status(200).send(result.recordsets[0][0]);
     sql.close();
