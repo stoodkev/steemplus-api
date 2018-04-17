@@ -58,6 +58,22 @@ app.get("/api/get-witnesses-rank", function(req, res){
   sql.close();});
 });
 
+app.get("/api/get-incoming-witness-votes/:username", function(req, res){
+  console.log(config.config_api);
+  sql.connect(config.config_api).then(pool => {
+    console.log("connected");
+    return pool.request()
+    .input("username",req.params.username)
+    .query('Select Witnesses.name, rank\
+  from Witnesses (NOLOCK)\
+  LEFT JOIN (SELECT ROW_NUMBER() OVER (ORDER BY (SELECT votes) DESC) AS rank, * FROM Witnesses (NOLOCK) WHERE signing_key != \'STM1111111111111111111111111111111114T1Anm\') AS rankedTable ON Witnesses.name = rankedTable.name;')
+  }).then(result => {
+    res.status(200).send(result.recordsets[0]);
+    sql.close();
+  }).catch(error => {console.log(error);
+  sql.close();});
+});
+
 }
 
 module.exports = appRouter;
