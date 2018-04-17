@@ -58,16 +58,14 @@ app.get("/api/get-witnesses-rank", function(req, res){
   sql.close();});
 });
 
-app.get("/api/get-incoming-witness-votes/:username", function(req, res){
+app.get("/api/get-received-witness-votes/:username", function(req, res){
   console.log(config.config_api);
   sql.connect(config.config_api).then(pool => {
     console.log("connected");
     return pool.request()
-    .input("username",req.params.username)
-    .query('Select Witnesses.name, rank\
-  from Witnesses (NOLOCK)\
-  LEFT JOIN (SELECT ROW_NUMBER() OVER (ORDER BY (SELECT votes) DESC) AS rank, * FROM Witnesses (NOLOCK) WHERE signing_key != \'STM1111111111111111111111111111111114T1Anm\') AS rankedTable ON Witnesses.name = rankedTable.name;')
-  }).then(result => {
+    .input("username","%"+req.params.username+"%")
+    .query("SELECT Accounts.name, (ISNULL(TRY_CONVERT(float, REPLACE(value_proxy, 'VESTS', '')), 0) + TRY_CONVERT(float, REPLACE(vesting_shares, 'VESTS', ''))) as totalVests, TRY_CONVERT(float, REPLACE(vesting_shares, 'VESTS', '')) as accountVests, ISNULL(TRY_CONVERT(float, REPLACE(value_proxy, 'VESTS', '')), 0) as proxiedVests FROM Accounts (NOLOCK) LEFT JOIN (SELECT proxy as name, SUM(TRY_CONVERT(float, REPLACE(vesting_shares, 'VESTS', ''))) as value_proxy FROM Accounts (NOLOCK) WHERE proxy IN (SELECT name FROM Accounts (NOLOCK) WHERE witness_votes LIKE @username) GROUP BY(proxy)) as proxy_table ON Accounts.name = proxy_table.name WHERE witness_votes LIKE @username")})
+    .then(result => {
     res.status(200).send(result.recordsets[0]);
     sql.close();
   }).catch(error => {console.log(error);
