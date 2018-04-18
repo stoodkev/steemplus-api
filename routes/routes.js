@@ -32,10 +32,13 @@ app.get("/api/get-witness/:username", function(req, res){
     console.log("connected");
     return pool.request()
     .input("username",req.params.username)
-    .query('SELECT timestamp, Witnesses.* \
-    FROM Witnesses (NOLOCK) \
-    LEFT JOIN Blocks ON Witnesses.last_confirmed_block_num = Blocks.block_num \
-    WHERE Witnesses.name = @username')
+    .query('SELECT lastWeekValue, lastMonthValue, lastYearValue, foreverValue, timestamp, Witnesses.* \
+FROM (SELECT SUM(vesting_shares) as lastWeekValue FROM VOProducerRewards (NOLOCK) WHERE producer = @username AND timestamp >= DATEADD(day,-7, GETDATE())) as lastWeekTable, \
+(SELECT SUM(vesting_shares) as lastMonthValue FROM VOProducerRewards (NOLOCK) WHERE producer = @username AND timestamp >= DATEADD(day,-31, GETDATE())) as lastMonthTable, \
+(SELECT SUM(vesting_shares) as lastYearValue FROM VOProducerRewards (NOLOCK) WHERE producer = @username AND timestamp >= DATEADD(day,-365, GETDATE())) as lastYearTable, \
+(SELECT SUM(vesting_shares) as ForeverValue FROM VOProducerRewards (NOLOCK) WHERE producer = @username ) as foreverTable, Witnesses (NOLOCK)\
+LEFT JOIN Blocks ON Witnesses.last_confirmed_block_num = Blocks.block_num \
+WHERE Witnesses.name = @username')
   }).then(result => {
     res.status(200).send(result.recordsets[0][0]);
     sql.close();
