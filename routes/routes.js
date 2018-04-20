@@ -76,6 +76,23 @@ app.get("/api/get-received-witness-votes/:username", function(req, res){
   sql.close();});
 });
 
+app.get("/api/get-incoming-delegations/:username", function(req, res){
+  console.log(config.config_api);
+  sql.connect(config.config_api).then(pool => {
+    console.log("connected");
+    return pool.request()
+    .input("username",req.params.username)
+    .query("SELECT delegator, vesting_shares, timestamp as delegation_date \
+    FROM TxDelegateVestingShares WHERE ID in (SELECT MAX(ID) as last_delegation_id \
+    FROM TxDelegateVestingShares (NOLOCK) \
+    WHERE delegatee = @username GROUP BY delegator)")})
+    .then(result => {
+    res.status(200).send(result.recordsets[0]);
+    sql.close();
+  }).catch(error => {console.log(error);
+  sql.close();});
+});
+
 }
 
 module.exports = appRouter;
