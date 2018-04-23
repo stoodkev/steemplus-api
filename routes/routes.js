@@ -93,6 +93,27 @@ app.get("/api/get-incoming-delegations/:username", function(req, res){
   sql.close();});
 });
 
+app.get("/api/get-wallet-content/:username", function(req, res){
+  console.log(config.config_api);
+  sql.connect(config.config_api).then(pool => {
+    console.log("connected");
+    return pool.request()
+    .input("username",req.params.username)
+    .query("select top 500 *\
+    from (select timestamp, reward_steem, reward_sbd, reward_vests, '' as amount, '' as amount_symbol, 'claim' as type, '' as memo, '' as to_from \
+    from TxClaimRewardBalances (NOLOCK) where account = @username\
+    union all\
+    select timestamp, '', '', '',amount, amount_symbol, 'transfer_to' as type, ISNULL(REPLACE(memo, '\"', '\'\''), '') as memo, \"from\" as to_from from TxTransfers (NOLOCK) where \"to\" = @username\
+    union all\
+    select timestamp, '', '', '', amount, amount_symbol, 'transfer_from' as type, ISNULL(REPLACE(memo, '\"', ''''), '') as memo , \"to\" as to_from from TxTransfers (NOLOCK) where \"from\" = @username \
+    )as wallet_history ORDER BY timestamp desc ")})
+    .then(result => {
+    res.status(200).send(result.recordsets[0]);
+    sql.close();
+  }).catch(error => {console.log(error);
+  sql.close();});
+});
+
 }
 
 module.exports = appRouter;
