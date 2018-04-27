@@ -14,8 +14,8 @@ var appRouter = function (app) {
       console.log("connected");
       return pool.request()
       .input("username","@"+req.params.username)
-      .query('SELECT TOP 100 created, permlink, title, author, LEFT(body,250) AS body,category, parent_author\
-      FROM Comments (NOLOCK)\
+      .query('SELECT TOP 100 created, permlink, title, author, REPLACE(LEFT(body,250),\'"\',\'\'\'\') AS body,category, parent_author, total_payout_value, pending_payout_value, net_votes, json_metadata\
+      FROM Comments\
       WHERE CONTAINS(body, @username)\
       ORDER BY created DESC\
       ')
