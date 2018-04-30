@@ -9,9 +9,7 @@ var appRouter = function (app) {
   });
 
   app.get("/api/get-mentions/:username", function(req, res){
-    console.log(config.config_api);
-    sql.connect(config.config_api).then(pool => {
-      console.log("connected");
+    new sql.ConnectionPool(config.config_api).connect().then(pool => {
       return pool.request()
       .input("username","@"+req.params.username)
       .query('SELECT TOP 100 created, permlink, title, author, REPLACE(LEFT(body,250),\'"\',\'\'\'\') AS body,category, parent_author, total_payout_value, pending_payout_value, net_votes, json_metadata\
@@ -27,8 +25,7 @@ var appRouter = function (app) {
 });
 
 app.get("/api/get-witness/:username", function(req, res){
-  console.log(config.config_api);
-  sql.connect(config.config_api).then(pool => {
+  new sql.ConnectionPool(config.config_api).connect().then(pool => {
     console.log("connected");
     return pool.request()
     .input("username",req.params.username)
@@ -47,8 +44,7 @@ WHERE Witnesses.name = @username')
 });
 
 app.get("/api/get-witnesses-rank", function(req, res){
-  console.log(config.config_api);
-  sql.connect(config.config_api).then(pool => {
+  new sql.ConnectionPool(config.config_api).connect().then(pool => {
     console.log("connected");
     return pool.request()
     .query('Select Witnesses.name, rank\
@@ -62,8 +58,7 @@ app.get("/api/get-witnesses-rank", function(req, res){
 });
 
 app.get("/api/get-received-witness-votes/:username", function(req, res){
-  console.log(config.config_api);
-  sql.connect(config.config_api).then(pool => {
+  new sql.ConnectionPool(config.config_api).connect().then(pool => {
     console.log("connected");
     return pool.request()
     .input("username2","%"+req.params.username+"%")
@@ -77,8 +72,7 @@ app.get("/api/get-received-witness-votes/:username", function(req, res){
 });
 
 app.get("/api/get-incoming-delegations/:username", function(req, res){
-  console.log(config.config_api);
-  sql.connect(config.config_api).then(pool => {
+  new sql.ConnectionPool(config.config_api).connect().then(pool => {
     console.log("connected");
     return pool.request()
     .input("username",req.params.username)
@@ -94,8 +88,7 @@ app.get("/api/get-incoming-delegations/:username", function(req, res){
 });
 
 app.get("/api/get-wallet-content/:username", function(req, res){
-  console.log(config.config_api);
-  sql.connect(config.config_api).then(pool => {
+  new sql.ConnectionPool(config.config_api).connect().then(pool => {
     console.log("connected");
     return pool.request()
     .input("username",req.params.username)
