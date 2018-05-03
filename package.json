@@ -8,7 +8,12 @@
     "dotenv": "^5.0.1",
     "express": "^4.16.3",
     "express-rate-limit": "^2.11.0",
-    "mssql": "^4.1.0"
+    "get-json": "^1.0.0",
+    "jquery": "^3.0.0",
+    "jquery-migrate": "^3.0.1",
+    "mssql": "^4.1.0",
+    "steem": "^0.7.1",
+    "xmlhttprequest": "^1.8.0"
   },
   "devDependencies": {},
   "scripts": {
