@@ -12,22 +12,26 @@ var appRouter = function (app) {
     res.status(200).send("Welcome to our restful API!");
   });
 
-  app.get("/api/get-mentions/:username", function(req, res){
-    new sql.ConnectionPool(config.config_api).connect().then(pool => {
-      return pool.request()
-      .input("username","@"+req.params.username)
-      .query('SELECT TOP 100 created, permlink, title, author, REPLACE(LEFT(body,250),\'"\',\'\'\'\') AS body,category, parent_author, total_payout_value, pending_payout_value, net_votes, json_metadata\
-      FROM Comments\
-      WHERE CONTAINS(body, @username)\
-      ORDER BY created DESC\
-      ')
-    }).then(result => {
-      res.status(200).send(result.recordsets[0]);
-      sql.close();
-    }).catch(error => {console.log(error);
-      sql.close();});
+// Get all the articles and comments where a given user is mentionned
+// @parameter @username : username
+app.get("/api/get-mentions/:username", function(req, res){
+  new sql.ConnectionPool(config.config_api).connect().then(pool => {
+    return pool.request()
+    .input("username","@"+req.params.username)
+    .query('SELECT TOP 100 created, permlink, title, author, REPLACE(LEFT(body,250),\'"\',\'\'\'\') AS body,category, parent_author, total_payout_value, pending_payout_value, net_votes, json_metadata\
+    FROM Comments\
+    WHERE CONTAINS(body, @username)\
+    ORDER BY created DESC\
+    ')
+  }).then(result => {
+    res.status(200).send(result.recordsets[0]);
+    sql.close();
+  }).catch(error => {console.log(error);
+    sql.close();});
 });
 
+// Get witness information for a given user
+// @parameter @username : username
 app.get("/api/get-witness/:username", function(req, res){
   new sql.ConnectionPool(config.config_api).connect().then(pool => {
     console.log("connected");
@@ -47,6 +51,8 @@ WHERE Witnesses.name = @username')
   sql.close();});
 });
 
+// Get witness ranking. This request doesn't include inactive witnesses
+// No parameter!
 app.get("/api/get-witnesses-rank", function(req, res){
   new sql.ConnectionPool(config.config_api).connect().then(pool => {
     console.log("connected");
@@ -61,6 +67,8 @@ app.get("/api/get-witnesses-rank", function(req, res){
   sql.close();});
 });
 
+// Get all the received witness votes for a given user. Includes proxified votes
+// @parameter @username : username
 app.get("/api/get-received-witness-votes/:username", function(req, res){
   new sql.ConnectionPool(config.config_api).connect().then(pool => {
     console.log("connected");
@@ -75,6 +83,9 @@ app.get("/api/get-received-witness-votes/:username", function(req, res){
   sql.close();});
 });
 
+
+// Get all the incoming delegations for a given user
+// @parameter @username : username
 app.get("/api/get-incoming-delegations/:username", function(req, res){
   new sql.ConnectionPool(config.config_api).connect().then(pool => {
     console.log("connected");
@@ -91,6 +102,8 @@ app.get("/api/get-incoming-delegations/:username", function(req, res){
   sql.close();});
 });
 
+// Get all the wallet information for a given user
+// @parameter @username : username
 app.get("/api/get-wallet-content/:username", function(req, res){
   new sql.ConnectionPool(config.config_api).connect().then(pool => {
     console.log("connected");
@@ -111,9 +124,12 @@ app.get("/api/get-wallet-content/:username", function(req, res){
   sql.close();});
 });
 
+
+// Routine for welcoming new users on the platform and direct them to SteemPlus.
+
 app.get("/welcome-users", function(req, res){
   var query = {
-    tag: 'hsvwa',
+    tag: 'introduceyourself',
     limit: 100
   }
   var chromeExtensionWebstoreURL = 'https://chrome.google.com/webstore/detail/steemplus/mjbkjgcplmaneajhcbegoffkedeankaj?hl=en';
@@ -155,6 +171,32 @@ getJSON('http://www.whateverorigin.org/get?url=' + encodeURIComponent(chromeExte
       });
     });
   });
+
+// Get all curation rewards, author rewards and benefactor rewards for a given user.
+// @parameter @username : username
+app.get("/api/get-rewards/:username", function(req, res){
+  new sql.ConnectionPool(config.config_api).connect().then(pool => {
+    return pool.request()
+    .input("username",req.params.username)
+    .query("SELECT *\
+            FROM ( SELECT timestamp, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='paid_curation', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCurationRewards WHERE curator=@username AND DATEDIFF(day, GETDATE(), timestamp) >= -14 AND DATEDIFF(day, GETDATE(), timestamp) <= -7\
+                 UNION ALL\
+                 SELECT timestamp, permlink, -1 as reward, sbd_payout, steem_payout, vesting_payout, type='paid_author', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOAuthorRewards WHERE author=@username AND DATEDIFF(day, GETDATE(), timestamp) >= -14 AND DATEDIFF(day, GETDATE(), timestamp) <= -7\
+                 UNION ALL\
+                 SELECT timestamp, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='paid_benefactor', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCommentBenefactorRewards WHERE benefactor=@username AND DATEDIFF(day, GETDATE(), timestamp) >= -14 AND DATEDIFF(day, GETDATE(), timestamp) <= -14\
+                 UNION ALL\
+                 SELECT timestamp, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='pending_curation', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCurationRewards WHERE curator=@username AND DATEDIFF(day, GETDATE(), timestamp) > -7\
+                 UNION ALL\
+                 SELECT timestamp, permlink, -1 as reward, sbd_payout, steem_payout, vesting_payout, type='pending_author', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOAuthorRewards WHERE author=@username AND DATEDIFF(day, GETDATE(), timestamp) > -7\
+                 UNION ALL\
+                 SELECT timestamp, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='pending_benefactor', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCommentBenefactorRewards WHERE benefactor=@username AND DATEDIFF(day, GETDATE(), timestamp) > -7\
+            ) as rewards\
+            ORDER BY timestamp desc")})
+    .then(result => {
+    res.status(200).send(result.recordsets[0]);
+    sql.close();
+  }).catch(error => {console.log(error);
+  sql.close();});
 });
 
 }
