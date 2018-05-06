@@ -127,7 +127,7 @@ app.get("/api/get-wallet-content/:username", function(req, res){
 
 // Routine for welcoming new users on the platform and direct them to SteemPlus.
 
-app.get("/welcome-users", function(req, res){
+app.get("/job/welcome-users", function(req, res){
   var query = {
     tag: 'introduceyourself',
     limit: 100
