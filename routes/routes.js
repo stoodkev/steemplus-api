@@ -171,6 +171,7 @@ getJSON('http://www.whateverorigin.org/get?url=' + encodeURIComponent(chromeExte
       });
     });
   });
+});
 
 // Get all curation rewards, author rewards and benefactor rewards for a given user.
 // @parameter @username : username
