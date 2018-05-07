@@ -15,13 +15,16 @@ var appRouter = function (app) {
 // Get all the articles and comments where a given user is mentionned
 // @parameter @username : username
 app.get("/api/get-mentions/:username", function(req, res){
+console.log(req.params.username);
   new sql.ConnectionPool(config.config_api).connect().then(pool => {
     return pool.request()
     .input("username","@"+req.params.username)
-    .query('SELECT TOP 100 created, permlink, title, author, REPLACE(LEFT(body,250),\'"\',\'\'\'\') AS body,category, parent_author, total_payout_value, pending_payout_value, net_votes, json_metadata\
+    .input("username2","%@"+req.params.username+" %")
+    .query('SELECT created, permlink, title, author, REPLACE(LEFT(body,250),\'"\',\'\'\'\') AS body,category, parent_author, total_payout_value, pending_payout_value, net_votes, json_metadata\
+    FROM (SELECT TOP 100 created, permlink, title, author,body,category, parent_author, total_payout_value, pending_payout_value, net_votes, json_metadata\
     FROM Comments\
-    WHERE CONTAINS(body, @username)\
-    ORDER BY created DESC\
+    WHERE CONTAINS(body, @username) ORDER BY created DESC) AS subtable\
+    WHERE body LIKE @username2 \
     ')
   }).then(result => {
     res.status(200).send(result.recordsets[0]);
