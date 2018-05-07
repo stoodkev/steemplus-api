@@ -99,7 +99,11 @@ app.get("/api/get-incoming-delegations/:username", function(req, res){
             FROM TxDelegateVestingShares \
             INNER JOIN ( \
               SELECT MAX(ID) as last_delegation_id \
+<<<<<<< HEAD
               FROM TxDelegateVestingShares \
+=======
+              FROM TxDelegateVestingShares \
+>>>>>>> 4fd0534f271fa7e1b51b48943777e43f186534b8
               WHERE delegatee = @username \
               GROUP BY delegator \
             ) AS Data ON TxDelegateVestingShares.ID = Data.last_delegation_id")})
@@ -118,7 +122,11 @@ app.get("/api/get-wallet-content/:username", function(req, res){
     return pool.request()
     .input("username",req.params.username)
     .query("select top 500 *\
+<<<<<<< HEAD
     from (\
+=======
+      from (\
+>>>>>>> 4fd0534f271fa7e1b51b48943777e43f186534b8
       select top 500 timestamp, reward_steem, reward_sbd, reward_vests, '' as amount, '' as amount_symbol, 'claim' as type, '' as memo, '' as to_from \
       from TxClaimRewardBalances where account = @username\
       union all\
@@ -189,17 +197,17 @@ app.get("/api/get-rewards/:username", function(req, res){
     return pool.request()
     .input("username",req.params.username)
     .query("SELECT * \
-            FROM ( SELECT timestamp, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='paid_curation', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCurationRewards WHERE curator=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < DATEADD(day,0, GETUTCDATE()) \
+            FROM ( SELECT timestamp, permlink, -1 as pending_payout_value, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, '' as beneficiaries, type='paid_curation' FROM VOCurationRewards WHERE curator=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < GETUTCDATE() \
               UNION ALL \
-              SELECT timestamp, permlink, -1 as reward, sbd_payout, steem_payout, vesting_payout, type='paid_author', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOAuthorRewards WHERE author=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < DATEADD(day,0, GETUTCDATE()) \
+              SELECT timestamp, permlink,  -1 as pending_payout_value, -1 as reward, sbd_payout, steem_payout, vesting_payout, '' as beneficiaries, type='paid_author' FROM VOAuthorRewards WHERE author=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < GETUTCDATE()  \
               UNION ALL \
-              SELECT timestamp, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='paid_benefactor', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCommentBenefactorRewards WHERE benefactor=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < DATEADD(day,0, GETUTCDATE()) \
+              SELECT timestamp, permlink,  -1 as pending_payout_value,TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, '' as beneficiaries, type='paid_benefactor' FROM VOCommentBenefactorRewards WHERE benefactor=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < GETUTCDATE() \
               UNION ALL \
-              SELECT timestamp, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='pending_curation', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCurationRewards WHERE curator=@username AND timestamp >= DATEADD(day,0, GETUTCDATE()) \
+              SELECT timestamp, permlink,  -1 as pending_payout_value,TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, '' as beneficiaries, type='pending_curation' FROM VOCurationRewards WHERE curator=@username AND timestamp >= DATEADD(day,0, GETUTCDATE()) \
               UNION ALL \
-              SELECT timestamp, permlink, -1 as reward, sbd_payout, steem_payout, vesting_payout, type='pending_author', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOAuthorRewards WHERE author=@username AND timestamp >= DATEADD(day,0, GETUTCDATE()) \
+              select created, permlink, pending_payout_value,  -1 as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vesting_payout, beneficiaries, 'pending_author' from Comments WHERE author = @username and pending_payout_value > 0 AND created >= DATEADD(day, -7, GETUTCDATE())   \
               UNION ALL \
-              SELECT timestamp, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='pending_benefactor', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCommentBenefactorRewards WHERE benefactor=@username AND timestamp >= DATEADD(day,0, GETUTCDATE()) \
+              SELECT timestamp, permlink,  -1 as pending_payout_value,TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, '' as beneficiaries, type='pending_benefactor' FROM VOCommentBenefactorRewards WHERE benefactor=@username AND timestamp >= DATEADD(day,0, GETUTCDATE()) \
             ) as rewards \
             ORDER BY timestamp desc")})
     .then(result => {
