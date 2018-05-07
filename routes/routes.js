@@ -183,17 +183,17 @@ app.get("/api/get-rewards/:username", function(req, res){
     return pool.request()
     .input("username",req.params.username)
     .query("SELECT *\
-            FROM ( SELECT timestamp, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='paid_curation', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCurationRewards WHERE curator=@username AND DATEDIFF(day, GETDATE(), timestamp) >= -14 AND DATEDIFF(day, GETDATE(), timestamp) <= -7\
+            FROM ( SELECT timestamp, author, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='paid_curation', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCurationRewards WHERE curator=@username AND DATEDIFF(day, GETDATE(), timestamp) >= -14 AND DATEDIFF(day, GETDATE(), timestamp) <= -7\
                  UNION ALL\
-                 SELECT timestamp, permlink, -1 as reward, sbd_payout, steem_payout, vesting_payout, type='paid_author', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOAuthorRewards WHERE author=@username AND DATEDIFF(day, GETDATE(), timestamp) >= -14 AND DATEDIFF(day, GETDATE(), timestamp) <= -7\
+                 SELECT timestamp, author,permlink, -1 as reward, sbd_payout, steem_payout, vesting_payout, type='paid_author', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOAuthorRewards WHERE author=@username AND DATEDIFF(day, GETDATE(), timestamp) >= -14 AND DATEDIFF(day, GETDATE(), timestamp) <= -7\
                  UNION ALL\
-                 SELECT timestamp, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='paid_benefactor', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCommentBenefactorRewards WHERE benefactor=@username AND DATEDIFF(day, GETDATE(), timestamp) >= -14 AND DATEDIFF(day, GETDATE(), timestamp) <= -14\
+                 SELECT timestamp,author, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='paid_benefactor', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCommentBenefactorRewards WHERE benefactor=@username AND DATEDIFF(day, GETDATE(), timestamp) >= -14 AND DATEDIFF(day, GETDATE(), timestamp) <= -14\
                  UNION ALL\
-                 SELECT timestamp, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='pending_curation', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCurationRewards WHERE curator=@username AND DATEDIFF(day, GETDATE(), timestamp) > -7\
+                 SELECT timestamp,author, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='pending_curation', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCurationRewards WHERE curator=@username AND DATEDIFF(day, GETDATE(), timestamp) > -7\
                  UNION ALL\
-                 SELECT timestamp, permlink, -1 as reward, sbd_payout, steem_payout, vesting_payout, type='pending_author', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOAuthorRewards WHERE author=@username AND DATEDIFF(day, GETDATE(), timestamp) > -7\
+                 SELECT timestamp,author, permlink, -1 as reward, sbd_payout, steem_payout, vesting_payout, type='pending_author', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOAuthorRewards WHERE author=@username AND DATEDIFF(day, GETDATE(), timestamp) > -7\
                  UNION ALL\
-                 SELECT timestamp, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='pending_benefactor', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCommentBenefactorRewards WHERE benefactor=@username AND DATEDIFF(day, GETDATE(), timestamp) > -7\
+                 SELECT timestamp, author,permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='pending_benefactor', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCommentBenefactorRewards WHERE benefactor=@username AND DATEDIFF(day, GETDATE(), timestamp) > -7\
             ) as rewards\
             ORDER BY timestamp desc")})
     .then(result => {
