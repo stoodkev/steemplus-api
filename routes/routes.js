@@ -99,11 +99,8 @@ app.get("/api/get-incoming-delegations/:username", function(req, res){
             FROM TxDelegateVestingShares \
             INNER JOIN ( \
               SELECT MAX(ID) as last_delegation_id \
-<<<<<<< HEAD
               FROM TxDelegateVestingShares \
-=======
               FROM TxDelegateVestingShares \
->>>>>>> 4fd0534f271fa7e1b51b48943777e43f186534b8
               WHERE delegatee = @username \
               GROUP BY delegator \
             ) AS Data ON TxDelegateVestingShares.ID = Data.last_delegation_id")})
@@ -122,11 +119,8 @@ app.get("/api/get-wallet-content/:username", function(req, res){
     return pool.request()
     .input("username",req.params.username)
     .query("select top 500 *\
-<<<<<<< HEAD
     from (\
-=======
       from (\
->>>>>>> 4fd0534f271fa7e1b51b48943777e43f186534b8
       select top 500 timestamp, reward_steem, reward_sbd, reward_vests, '' as amount, '' as amount_symbol, 'claim' as type, '' as memo, '' as to_from \
       from TxClaimRewardBalances where account = @username\
       union all\
