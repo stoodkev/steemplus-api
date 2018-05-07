@@ -41,10 +41,10 @@ app.get("/api/get-witness/:username", function(req, res){
     return pool.request()
     .input("username",req.params.username)
     .query('SELECT lastWeekValue, lastMonthValue, lastYearValue, foreverValue, timestamp, Witnesses.* \
-FROM (SELECT SUM(vesting_shares) as lastWeekValue FROM VOProducerRewards (NOLOCK) WHERE producer = @username AND timestamp >= DATEADD(day,-7, GETDATE())) as lastWeekTable, \
-(SELECT SUM(vesting_shares) as lastMonthValue FROM VOProducerRewards (NOLOCK) WHERE producer = @username AND timestamp >= DATEADD(day,-31, GETDATE())) as lastMonthTable, \
-(SELECT SUM(vesting_shares) as lastYearValue FROM VOProducerRewards (NOLOCK) WHERE producer = @username AND timestamp >= DATEADD(day,-365, GETDATE())) as lastYearTable, \
-(SELECT SUM(vesting_shares) as ForeverValue FROM VOProducerRewards (NOLOCK) WHERE producer = @username ) as foreverTable, Witnesses (NOLOCK)\
+FROM (SELECT SUM(vesting_shares) as lastWeekValue FROM VOProducerRewards WHERE producer = @username AND timestamp >= DATEADD(day,-7, GETUTCDATE())) as lastWeekTable, \
+(SELECT SUM(vesting_shares) as lastMonthValue FROM VOProducerRewards WHERE producer = @username AND timestamp >= DATEADD(day,-31, GETUTCDATE())) as lastMonthTable, \
+(SELECT SUM(vesting_shares) as lastYearValue FROM VOProducerRewards WHERE producer = @username AND timestamp >= DATEADD(day,-365, GETUTCDATE())) as lastYearTable, \
+(SELECT SUM(vesting_shares) as ForeverValue FROM VOProducerRewards WHERE producer = @username ) as foreverTable, Witnesses \
 LEFT JOIN Blocks ON Witnesses.last_confirmed_block_num = Blocks.block_num \
 WHERE Witnesses.name = @username')
   }).then(result => {
@@ -62,7 +62,7 @@ app.get("/api/get-witnesses-rank", function(req, res){
     return pool.request()
     .query('Select Witnesses.name, rank\
   from Witnesses (NOLOCK)\
-  LEFT JOIN (SELECT ROW_NUMBER() OVER (ORDER BY (SELECT votes) DESC) AS rank, * FROM Witnesses (NOLOCK) WHERE signing_key != \'STM1111111111111111111111111111111114T1Anm\') AS rankedTable ON Witnesses.name = rankedTable.name;')
+  LEFT JOIN (SELECT ROW_NUMBER() OVER (ORDER BY (SELECT votes) DESC) AS rank, * FROM Witnesses WHERE signing_key != \'STM1111111111111111111111111111111114T1Anm\') AS rankedTable ON Witnesses.name = rankedTable.name;')
   }).then(result => {
     res.status(200).send(result.recordsets[0]);
     sql.close();
@@ -78,7 +78,8 @@ app.get("/api/get-received-witness-votes/:username", function(req, res){
     return pool.request()
     .input("username2","%"+req.params.username+"%")
     .input("username",req.params.username)
-    .query("SELECT MyAccounts.timestamp,MyAccounts.account,(ISNULL(TRY_CONVERT(float,REPLACE(value_proxy,'VESTS','')),0)+TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS','')))as totalVests,TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS',''))as accountVests,ISNULL(TRY_CONVERT(float,REPLACE(value_proxy,'VESTS','')),0)as proxiedVests FROM(SELECT B.*,A.vesting_shares FROM Accounts A(NOLOCK),(select*from TxAccountWitnessVotes(NOLOCK)where ID in(select MAX(ID)as last from TxAccountWitnessVotes(NOLOCK)where witness=@username group by account)and approve='true')as B where B.account=A.name)as MyAccounts LEFT JOIN(SELECT proxy as name,SUM(TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS','')))as value_proxy FROM Accounts(NOLOCK)WHERE proxy IN(SELECT name FROM Accounts(NOLOCK)WHERE witness_votes LIKE @username2)GROUP BY(proxy))as proxy_table ON MyAccounts.account=proxy_table.name")})
+    .query("SELECT MyAccounts.timestamp, MyAccounts.account, (ISNULL(TRY_CONVERT(float,REPLACE(value_proxy,'VESTS','')),0) + TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS',''))) as totalVests, TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS','')) as accountVests, ISNULL(TRY_CONVERT(float,REPLACE(value_proxy,'VESTS','')),0) as proxiedVests \
+            FROM (SELECT B.timestamp, B.account,A.vesting_shares FROM Accounts A, (select timestamp, account from TxAccountWitnessVotes where ID IN (select MAX(ID)as last from TxAccountWitnessVotes where witness=@username group by account) and approve=1)as B where B.account=A.name)as MyAccounts LEFT JOIN(SELECT proxy as name,SUM(TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS',''))) as value_proxy FROM Accounts WHERE proxy IN ( SELECT name FROM Accounts WHERE witness_votes LIKE @username2 and proxy != '')GROUP BY(proxy))as proxy_table ON MyAccounts.account=proxy_table.name")})
     .then(result => {
     res.status(200).send(result.recordsets[0]);
     sql.close();
@@ -95,9 +96,13 @@ app.get("/api/get-incoming-delegations/:username", function(req, res){
     return pool.request()
     .input("username",req.params.username)
     .query("SELECT delegator, vesting_shares, timestamp as delegation_date \
-    FROM TxDelegateVestingShares WHERE ID in (SELECT MAX(ID) as last_delegation_id \
-    FROM TxDelegateVestingShares (NOLOCK) \
-    WHERE delegatee = @username GROUP BY delegator)")})
+            FROM TxDelegateVestingShares \
+            INNER JOIN ( \
+              SELECT MAX(ID) as last_delegation_id \
+              FROM TxDelegateVestingShares \
+              WHERE delegatee = @username \
+              GROUP BY delegator \
+            ) AS Data ON TxDelegateVestingShares.ID = Data.last_delegation_id")})
     .then(result => {
     res.status(200).send(result.recordsets[0]);
     sql.close();
@@ -113,12 +118,13 @@ app.get("/api/get-wallet-content/:username", function(req, res){
     return pool.request()
     .input("username",req.params.username)
     .query("select top 500 *\
-    from (select timestamp, reward_steem, reward_sbd, reward_vests, '' as amount, '' as amount_symbol, 'claim' as type, '' as memo, '' as to_from \
-    from TxClaimRewardBalances (NOLOCK) where account = @username\
-    union all\
-    select timestamp, '', '', '',amount, amount_symbol, 'transfer_to' as type, ISNULL(REPLACE(memo, '\"', '\'\''), '') as memo, \"from\" as to_from from TxTransfers (NOLOCK) where \"to\" = @username\
-    union all\
-    select timestamp, '', '', '', amount, amount_symbol, 'transfer_from' as type, ISNULL(REPLACE(memo, '\"', ''''), '') as memo , \"to\" as to_from from TxTransfers (NOLOCK) where \"from\" = @username \
+    from (\
+      select top 500 timestamp, reward_steem, reward_sbd, reward_vests, '' as amount, '' as amount_symbol, 'claim' as type, '' as memo, '' as to_from \
+      from TxClaimRewardBalances where account = @username\
+      union all\
+      select top 500 timestamp, '', '', '',amount, amount_symbol, 'transfer_to' as type, ISNULL(REPLACE(memo, '\"', '\'\''), '') as memo, \"from\" as to_from from TxTransfers where [to] = @username\
+      union all\
+      select top 500 timestamp, '', '', '', amount, amount_symbol, 'transfer_from' as type, ISNULL(REPLACE(memo, '\"', ''''), '') as memo , \"to\" as to_from from TxTransfers where [from] = @username \
     )as wallet_history ORDER BY timestamp desc ")})
     .then(result => {
     res.status(200).send(result.recordsets[0]);
@@ -182,19 +188,19 @@ app.get("/api/get-rewards/:username", function(req, res){
   new sql.ConnectionPool(config.config_api).connect().then(pool => {
     return pool.request()
     .input("username",req.params.username)
-    .query("SELECT *\
-            FROM ( SELECT timestamp, author, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='paid_curation', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCurationRewards WHERE curator=@username AND DATEDIFF(day, GETDATE(), timestamp) >= -14 AND DATEDIFF(day, GETDATE(), timestamp) <= -7\
-                 UNION ALL\
-                 SELECT timestamp, author,permlink, -1 as reward, sbd_payout, steem_payout, vesting_payout, type='paid_author', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOAuthorRewards WHERE author=@username AND DATEDIFF(day, GETDATE(), timestamp) >= -14 AND DATEDIFF(day, GETDATE(), timestamp) <= -7\
-                 UNION ALL\
-                 SELECT timestamp,author, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='paid_benefactor', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCommentBenefactorRewards WHERE benefactor=@username AND DATEDIFF(day, GETDATE(), timestamp) >= -14 AND DATEDIFF(day, GETDATE(), timestamp) <= -14\
-                 UNION ALL\
-                 SELECT timestamp,author, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='pending_curation', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCurationRewards WHERE curator=@username AND DATEDIFF(day, GETDATE(), timestamp) > -7\
-                 UNION ALL\
-                 SELECT timestamp,author, permlink, -1 as reward, sbd_payout, steem_payout, vesting_payout, type='pending_author', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOAuthorRewards WHERE author=@username AND DATEDIFF(day, GETDATE(), timestamp) > -7\
-                 UNION ALL\
-                 SELECT timestamp, author,permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='pending_benefactor', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCommentBenefactorRewards WHERE benefactor=@username AND DATEDIFF(day, GETDATE(), timestamp) > -7\
-            ) as rewards\
+    .query("SELECT * \
+            FROM ( SELECT timestamp, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='paid_curation', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCurationRewards WHERE curator=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < DATEADD(day,0, GETUTCDATE()) \
+              UNION ALL \
+              SELECT timestamp, permlink, -1 as reward, sbd_payout, steem_payout, vesting_payout, type='paid_author', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOAuthorRewards WHERE author=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < DATEADD(day,0, GETUTCDATE()) \
+              UNION ALL \
+              SELECT timestamp, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='paid_benefactor', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCommentBenefactorRewards WHERE benefactor=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < DATEADD(day,0, GETUTCDATE()) \
+              UNION ALL \
+              SELECT timestamp, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='pending_curation', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCurationRewards WHERE curator=@username AND timestamp >= DATEADD(day,0, GETUTCDATE()) \
+              UNION ALL \
+              SELECT timestamp, permlink, -1 as reward, sbd_payout, steem_payout, vesting_payout, type='pending_author', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOAuthorRewards WHERE author=@username AND timestamp >= DATEADD(day,0, GETUTCDATE()) \
+              UNION ALL \
+              SELECT timestamp, permlink, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, type='pending_benefactor', DATEDIFF(day, GETDATE(), timestamp) as diff FROM VOCommentBenefactorRewards WHERE benefactor=@username AND timestamp >= DATEADD(day,0, GETUTCDATE()) \
+            ) as rewards \
             ORDER BY timestamp desc")})
     .then(result => {
     res.status(200).send(result.recordsets[0]);
