@@ -8,7 +8,9 @@ const config_api = {
 }
 
 let config={
-  config_api:config_api
+  config_api:config_api,
+  bot:process.env.BOT,
+  wif:process.env.WIF
 }
 
 module.exports=config;
