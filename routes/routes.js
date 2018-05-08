@@ -100,7 +100,6 @@ app.get("/api/get-incoming-delegations/:username", function(req, res){
             INNER JOIN ( \
               SELECT MAX(ID) as last_delegation_id \
               FROM TxDelegateVestingShares \
-              FROM TxDelegateVestingShares \
               WHERE delegatee = @username \
               GROUP BY delegator \
             ) AS Data ON TxDelegateVestingShares.ID = Data.last_delegation_id")})
