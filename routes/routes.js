@@ -139,7 +139,7 @@ app.get("/api/get-wallet-content/:username", function(req, res){
 app.get("/job/welcome-users", function(req, res){
   var query = {
     tag: 'introduceyourself',
-    limit: 29
+    limit: 28
   }
   var chromeExtensionWebstoreURL = 'https://chrome.google.com/webstore/detail/steemplus/mjbkjgcplmaneajhcbegoffkedeankaj?hl=en';
 getJSON('http://www.whateverorigin.org/get?url=' + encodeURIComponent(chromeExtensionWebstoreURL),function(e,response){
@@ -166,7 +166,7 @@ getJSON('http://www.whateverorigin.org/get?url=' + encodeURIComponent(chromeExte
             steem.broadcast.comment(config.wif, result.author, result.permlink, config.bot, result.permlink+"-re-welcome-to-steemplus", "Welcome to SteemPlus", utils.commentNewUser(result,r[0],numUsers), {}, function(err, result) {
               console.log(err, result);
             });
-          },i*20.5*1000);
+          },i*21*1000);
         });
       }
       else if(err!==null)
