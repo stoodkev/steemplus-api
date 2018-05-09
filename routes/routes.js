@@ -139,7 +139,7 @@ app.get("/api/get-wallet-content/:username", function(req, res){
 app.get("/job/welcome-users", function(req, res){
   var query = {
     tag: 'introduceyourself',
-    limit: 10
+    limit: 30
   }
   var chromeExtensionWebstoreURL = 'https://chrome.google.com/webstore/detail/steemplus/mjbkjgcplmaneajhcbegoffkedeankaj?hl=en';
 getJSON('http://www.whateverorigin.org/get?url=' + encodeURIComponent(chromeExtensionWebstoreURL),function(e,response){
