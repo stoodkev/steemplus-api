@@ -124,7 +124,7 @@ app.get("/api/get-wallet-content/:username", function(req, res){
       union all\
       select top 500 timestamp, '', '', '',amount, amount_symbol, 'transfer_to' as type, ISNULL(REPLACE(memo, '\"', '\'\''), '') as memo, \"from\" as to_froms from TxTransfers where [to] = @username ORDER BY timestamp desc\
       union all\
-      select top 500 timestamp, '', '', '', amount, amount_symbol, 'transfer_from' as type, ISNULL(REPLACE(memo, '\"', '\'''), '') as memo , \"to\" as to_from from TxTransfers where [from] = @username ORDER BY timestamp desc\
+      select top 500 timestamp, '', '', '', amount, amount_symbol, 'transfer_from' as type, ISNULL(REPLACE(memo, '\"', '\'''), '') as memo , \"to\" as to_from from TxTransfers where [from] = @username ORDER BY timestamp desc \
     ) as wallet_history ORDER BY timestamp desc ")})
     .then(result => {
     res.status(200).send(result.recordsets[0]);
@@ -163,6 +163,12 @@ app.get("/job/welcome-users/:key", function(req, res){
             else if (break_point!=-1)
               return;
             console.log(i);
+            setTimeout(function(){
+            //console.log(result.author, result.permlink);
+              steem.broadcast.comment(config.wif, result.author, result.permlink, config.bot, result.permlink+"-re-welcome-to-steemplus", "Welcome to SteemPlus", utils.commentNewUser(result,r[0],numUsers), {}, function(err, result) {
+                console.log(err, result);
+              });
+            },i*21*1000);
           });
         }
         else if(err!==null)
