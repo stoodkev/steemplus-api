@@ -120,11 +120,11 @@ app.get("/api/get-wallet-content/:username", function(req, res){
     .query("select top 500 *\
       from (\
       select top 500 timestamp, reward_steem, reward_sbd, reward_vests, '' as amount, '' as amount_symbol, 'claim' as type, '' as memo, '' as to_from \
-      from TxClaimRewardBalances where account = @username\
+      from TxClaimRewardBalances where account = @username ORDER BY timestamp desc\
       union all\
-      select top 500 timestamp, '', '', '',amount, amount_symbol, 'transfer_to' as type, ISNULL(REPLACE(memo, '\"', '\'\''), '') as memo, \"from\" as to_froms from TxTransfers where [to] = @username\
+      select top 500 timestamp, '', '', '',amount, amount_symbol, 'transfer_to' as type, ISNULL(REPLACE(memo, '\"', '\'\''), '') as memo, \"from\" as to_froms from TxTransfers where [to] = @username ORDER BY timestamp desc\
       union all\
-      select top 500 timestamp, '', '', '', amount, amount_symbol, 'transfer_from' as type, ISNULL(REPLACE(memo, '\"', '\'''), '') as memo , \"to\" as to_from from TxTransfers where [from] = @username \
+      select top 500 timestamp, '', '', '', amount, amount_symbol, 'transfer_from' as type, ISNULL(REPLACE(memo, '\"', '\'''), '') as memo , \"to\" as to_from from TxTransfers where [from] = @username ORDER BY timestamp desc\
     ) as wallet_history ORDER BY timestamp desc ")})
     .then(result => {
     res.status(200).send(result.recordsets[0]);
@@ -151,6 +151,7 @@ app.get("/job/welcome-users/:key", function(req, res){
     steem.api.getDiscussionsByAuthorBeforeDateAsync('steem-plus',null, new Date().toISOString().split('.')[0],1).then(function(r,e){
       //console.log(e,r);
       steem.api.getDiscussionsByCreated(query, function(err, results) {
+        console.log(results);
         var break_point=-1;
         if(err==null&&results.length!=0){
           results.forEach((result,i)=>{
@@ -162,12 +163,6 @@ app.get("/job/welcome-users/:key", function(req, res){
             else if (break_point!=-1)
               return;
             console.log(i);
-            setTimeout(function(){
-            //console.log(result.author, result.permlink);
-              steem.broadcast.comment(config.wif, result.author, result.permlink, config.bot, result.permlink+"-re-welcome-to-steemplus", "Welcome to SteemPlus", utils.commentNewUser(result,r[0],numUsers), {}, function(err, result) {
-                console.log(err, result);
-              });
-            },i*21*1000);
           });
         }
         else if(err!==null)
