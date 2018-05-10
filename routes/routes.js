@@ -20,8 +20,8 @@ console.log(req.params.username);
     return pool.request()
     .input("username","\@"+req.params.username+" ")
     .input("username2","%@"+req.params.username+" %")
-    .query('SELECT TOP 100 created, permlink, title, author, REPLACE(LEFT(body,250),\'"\',\'\'\'\') AS body,category, parent_author, total_payout_value, pending_payout_value, net_votes, json_metadata\
-    FROM (SELECT  TOP 500 created, permlink, title, author,body,category, parent_author, total_payout_value, pending_payout_value, net_votes, json_metadata\
+    .query('SELECT TOP 100 url,created, permlink, title, author, REPLACE(LEFT(body,250),\'"\',\'\'\'\') AS body,category, parent_author, total_payout_value, pending_payout_value, net_votes, json_metadata\
+    FROM (SELECT  TOP 500 url,created, permlink, title, author,body,category, parent_author, total_payout_value, pending_payout_value, net_votes, json_metadata\
     FROM Comments\
     WHERE CONTAINS(body, @username) ORDER BY created DESC ) AS subtable  \
     WHERE body LIKE @username2  \
