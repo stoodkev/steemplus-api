@@ -215,6 +215,21 @@ app.get("/api/get-rewards/:username", function(req, res){
   sql.close();});
 });
 
+//Get all followers / followee for a given user
+//@parameter @username : username
+app.get("/api/get-followers-followee/:username", function(req, res){
+  new sql.ConnectionPool(config.config_api).connect().then(pool => {
+    return pool.request()
+    .input("username",req.params.username)
+    .query("select * from Followers where follower = @username or following = @username")})
+    .then(result => {
+    res.status(200).send(result.recordsets[0]);
+    sql.close();
+  }).catch(error => {console.log(error);
+  sql.close();});
+});
+
 }
 
 module.exports = appRouter;
+  
