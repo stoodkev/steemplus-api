@@ -19,7 +19,7 @@ console.log(req.params.username);
   new sql.ConnectionPool(config.config_api).connect().then(pool => {
     return pool.request()
     .input("username","\@"+req.params.username+" ")
-    .input("username2","%@"+req.params.username+"[ \<\!\?\.\,\;\]\[]%")
+    .input("username2","%@"+req.params.username+"[ \<\!\?\.\,\;]%")
     .query('SELECT TOP 100 url,created, permlink, root_title, title, author, REPLACE(LEFT(body,250),\'"\',\'\'\'\') AS body,category, parent_author, total_payout_value, pending_payout_value, net_votes, json_metadata\
     FROM (SELECT  TOP 500 url,created, permlink, root_title, title, author,body,category, parent_author, total_payout_value, pending_payout_value, net_votes, json_metadata\
     FROM Comments\
