@@ -19,12 +19,20 @@ console.log(req.params.username);
   new sql.ConnectionPool(config.config_api).connect().then(pool => {
     return pool.request()
     .input("username","\@"+req.params.username+" ")
-    .input("username2","%@"+req.params.username+"[ \<\!\?\.\,\;]%")
+    .input("username2","%@"+req.params.username+" %")
+    .input("username3","%@"+req.params.username+"<%")
+    .input("username4","%@"+req.params.username+"[%")
+    .input("username5","%@"+req.params.username+"]%")
+    .input("username6","%@"+req.params.username+".%")
+    .input("username7","%@"+req.params.username+"!%")
+    .input("username8","%@"+req.params.username+"?%")
+    .input("username9","%@"+req.params.username+",%")
+    .input("username10","%@"+req.params.username+";%")
     .query('SELECT TOP 100 url,created, permlink, root_title, title, author, REPLACE(LEFT(body,250),\'"\',\'\'\'\') AS body,category, parent_author, total_payout_value, pending_payout_value, net_votes, json_metadata\
     FROM (SELECT  TOP 500 url,created, permlink, root_title, title, author,body,category, parent_author, total_payout_value, pending_payout_value, net_votes, json_metadata\
     FROM Comments\
     WHERE CONTAINS(body, @username) ORDER BY created DESC ) AS subtable  \
-    WHERE body LIKE @username2 ORDER BY created DESC \
+    WHERE body LIKE @username2 OR body LIKE @username3 OR body LIKE @username4 OR body LIKE @username5 OR body LIKE @username6 OR body LIKE @username7 OR body LIKE @username8 OR body LIKE @username9 OR body LIKE @username10 ORDER BY created DESC \
     ')
   }).then(result => {
     res.status(200).send(result.recordsets[0]);
