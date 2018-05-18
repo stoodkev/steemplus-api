@@ -24,7 +24,7 @@ console.log(req.params.username);
     FROM (SELECT  TOP 500 url,created, permlink, root_title, title, author,body,category, parent_author, total_payout_value, pending_payout_value, net_votes, json_metadata\
     FROM Comments\
     WHERE CONTAINS(body, @username) ORDER BY created DESC ) AS subtable  \
-    WHERE body LIKE @username2  \
+    WHERE body LIKE @username2 ORDER BY created DESC \
     ')
   }).then(result => {
     res.status(200).send(result.recordsets[0]);
@@ -245,4 +245,3 @@ app.get("/api/get-last-block-id", function(req, res){
 }
 
 module.exports = appRouter;
-  
