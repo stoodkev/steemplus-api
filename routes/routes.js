@@ -18,7 +18,7 @@ app.get("/api/get-mentions/:username", function(req, res){
 console.log(req.params.username);
   new sql.ConnectionPool(config.config_api).connect().then(pool => {
     return pool.request()
-    .input("username","\@"+req.params.username+" ")
+    .input("username","\@"+req.params.username)
     .input("username2","%@"+req.params.username+" %")
     .input("username3","%@"+req.params.username+"<%")
     .input("username4","%@"+req.params.username+"[%")
