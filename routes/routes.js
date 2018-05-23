@@ -242,6 +242,42 @@ app.get("/api/get-last-block-id", function(req, res){
   sql.close();});
 });
 
+//Get the list of all resteem for a post.
+// @parameter : list of all the posts we want a list for.
+// The post is select by {permlink, author} because permlink can be the same for different authors.
+app.post("/api/get-reblogs-per-post", function(req, res){
+  
+  // get parameters from request body
+  var data = req.body.data;
+  var wheres = [];
+
+  // build where clause for query
+  data.forEach(function(item){
+    wheres.push("(permlink = '" + item.permlink + "' AND author='"+ item.author +"')");
+  });
+  var requestWhere = wheres.join(' OR ');
+
+  // build query
+  var querySQL = "Select account, author, permlink from Reblogs WHERE "+requestWhere;
+  
+  // execute query only if there is where clause
+  if(wheres.length > 0)
+  {
+    new sql.ConnectionPool(config.config_api).connect().then(pool => {
+      return pool.request()
+      .query(querySQL)})
+      .then(result => {
+      res.status(200).send(result.recordsets[0]);
+      sql.close();
+    }).catch(error => {console.log(error);
+    sql.close();});
+  }
+  else
+  {
+    res.status(520).send('Wrong parameters');
+  }
+});
+
 }
 
 module.exports = appRouter;
