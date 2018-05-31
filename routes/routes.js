@@ -173,6 +173,7 @@ app.get("/job/welcome-users/:key", function(req, res){
             console.log(i);
             setTimeout(function(){
             //console.log(result.author, result.permlink);
+            if(!JSON.parse(result.json_metadata).tags.includes("polish"))
               steem.broadcast.comment(config.wif, result.author, result.permlink, config.bot, result.permlink+"-re-welcome-to-steemplus", "Welcome to SteemPlus", utils.commentNewUser(result,r[0],numUsers), {}, function(err, result) {
                 console.log(err, result);
               });
@@ -254,7 +255,7 @@ app.get("/api/get-last-block-id", function(req, res){
 // @parameter : list of all the posts we want a list for.
 // The post is select by {permlink, author} because permlink can be the same for different authors.
 app.post("/api/get-reblogs-per-post", function(req, res){
-  
+
   // get parameters from request body
   var data = req.body.data;
   var wheres = [];
@@ -267,7 +268,7 @@ app.post("/api/get-reblogs-per-post", function(req, res){
 
   // build query
   var querySQL = "Select account, author, permlink from Reblogs WHERE "+requestWhere;
-  
+
   // execute query only if there is where clause
   if(wheres.length > 0)
   {
