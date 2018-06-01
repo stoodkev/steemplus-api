@@ -254,7 +254,7 @@ app.get("/api/get-last-block-id", function(req, res){
 //Get the list of all resteem for a post.
 // @parameter : list of all the posts we want a list for.
 // The post is select by {permlink, author} because permlink can be the same for different authors.
-app.post("/api/get-reblogs-per-post", function(req, res){
+app.post("/api/get-reblogs", function(req, res){
 
   // get parameters from request body
   var data = req.body.data;
