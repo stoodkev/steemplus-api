@@ -197,6 +197,26 @@ app.get("/job/welcome-users/:key", function(req, res){
   }
 });
 
+app.get("/job/power/:key", function(req, res){
+  if(req.params.key==config.key){
+    steem.api.getAccounts(['steemplus-pay'], function(err, response){
+      console.log(response[0].reward_steem_balance);
+      steem.broadcast.claimRewardBalance(config.payPostKey, 'steemplus-pay', response[0].reward_steem_balance, response[0].reward_sbd_balance, response[0].reward_vesting_balance, function(err, result) {
+        console.log((parseFloat(response[0].reward_steem_balance.split(" ")[0])+parseFloat(response[0].balance.split(" ")[0])).toFixed(3)+" STEEM");
+        console.log(err,result);
+        steem.broadcast.transferToVesting(config.payActKey, 'steemplus-pay', 'steemplus-pay', (parseFloat(response[0].reward_steem_balance.split(" ")[0])+parseFloat(response[0].balance.split(" ")[0])).toFixed(3)+" STEEM", function(err, result) {
+          console.log(err, result);
+        });
+      });
+
+    });
+
+  }
+  else {
+    res.status(403).send("Permission denied");
+  }
+});
+
 // Get all curation rewards, author rewards and benefactor rewards for a given user.
 // @parameter @username : username
 app.get("/api/get-rewards/:username", function(req, res){
@@ -254,7 +274,7 @@ app.get("/api/get-last-block-id", function(req, res){
 //Get the list of all resteem for a post.
 // @parameter : list of all the posts we want a list for.
 // The post is select by {permlink, author} because permlink can be the same for different authors.
-app.post("/api/get-reblogs", function(req, res){
+app.post("/api/get-reblogs-per-post", function(req, res){
 
   // get parameters from request body
   var data = req.body.data;

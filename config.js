@@ -11,7 +11,9 @@ let config={
   config_api:config_api,
   bot:process.env.BOT,
   wif:process.env.WIF,
-  key:process.env.MASTER
+  key:process.env.MASTER,
+  payPostKey:process.env.PAY_POST_KEY,
+  payActKey:process.env.PAY_ACT_KEY
 }
 
 module.exports=config;
