@@ -4,7 +4,7 @@ var routes = require("./routes/routes.js");
 var app = express();
 require('dotenv').config();
 var RateLimit = require('express-rate-limit');
-var MongoClient = require('mongodb').MongoClient;
+// var MongoClient = require('mongodb').MongoClient;
 
 
 app.enable('trust proxy'); // only if you're behind a reverse proxy (Heroku, Bluemix, AWS if you use an ELB, custom Nginx setup, etc)
@@ -15,7 +15,7 @@ var limiter = new RateLimit({
   delayMs: 0 // disable delaying - full speed until the max limit is reached
 });
 
-MongoClient.connect(process.env.MONGODB_URI);
+// MongoClient.connect(process.env.MONGODB_URI);
 
 //  apply to all requests
 app.use(limiter);
