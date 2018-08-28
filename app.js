@@ -4,6 +4,7 @@ var routes = require("./routes/routes.js");
 var app = express();
 require('dotenv').config();
 var RateLimit = require('express-rate-limit');
+var mongoose = require("mongoose");
 
 app.enable('trust proxy'); // only if you're behind a reverse proxy (Heroku, Bluemix, AWS if you use an ELB, custom Nginx setup, etc)
 
