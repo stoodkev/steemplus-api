@@ -322,7 +322,7 @@ var appRouter = function (app) {
         where timestamp >= DATEADD(day, -31, GETUTCDATE()) 
         AND memo LIKE 'steemplus%' 
         AND ([to] = 'minnowbooster' OR [from] = 'postpromoter');
-        `)});
+        `)})
       .then(result => {
       res.status(200).send(result.recordsets[0]);
       sql.close();
