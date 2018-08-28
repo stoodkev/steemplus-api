@@ -12,6 +12,10 @@ var limiter = new RateLimit({
   max: 20, // limit each IP to 20 requests per windowMs
   delayMs: 0 // disable delaying - full speed until the max limit is reached
 });
+
+mongoose.Promise = global.Promise;
+mongoose.connect("mongodb://" +config.local_db_config.server + "/" + config.local_db_config.database);
+
 //  apply to all requests
 app.use(limiter);
 

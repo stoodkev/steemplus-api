@@ -2,8 +2,8 @@ let config=require("../config");
 let sql=require("mssql");
 let steem=require("steem");
 let utils=require("../utils");
-var getJSON = require('get-json')
-
+var getJSON = require('get-json');
+var mongoose = require("mongoose");
 
 var lastPermlink=null;
 var appRouter = function (app) {
@@ -316,7 +316,13 @@ var appRouter = function (app) {
   app.get("/job/update-steemplus-points", function(req, res){
     new sql.ConnectionPool(config.config_api).connect().then(pool => {
       return pool.request()
-      .query(querySQL)})
+      .query(`
+        select timestamp, [from], [to], amount, amount_symbol, memo 
+        from TxTransfers 
+        where timestamp >= DATEADD(day, -31, GETUTCDATE()) 
+        AND memo LIKE 'steemplus%' 
+        AND ([to] = 'minnowbooster' OR [from] = 'postpromoter');
+        `)});
       .then(result => {
       res.status(200).send(result.recordsets[0]);
       sql.close();
@@ -325,5 +331,6 @@ var appRouter = function (app) {
   });
 
 }
+
 
 module.exports = appRouter;
