@@ -25,8 +25,8 @@ app.use(limiter);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-
-mongoose.connect(process.env.MONGODB_URI, function (err, res) {
+console.log(process.env.MONGODB_URI);
+mongoose.connect(process.env.MONGODB_URI||'http://ds133152.mlab.com:33152/heroku_fl6ldd26', function (err, res) {
   if (err) 
   {
     console.log ('ERROR connecting to: ' + uristring + '. ' + err);

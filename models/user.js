@@ -1,4 +1,5 @@
 var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
 
 var User = mongoose.model("User", new mongoose.Schema({
   accountName : String,

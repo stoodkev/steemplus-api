@@ -339,7 +339,7 @@ var appRouter = function (app) {
   //     sql.close();
   //   }).catch(error => {console.log(error);
   //   sql.close();});
-  // });
+  });
 
 }
 

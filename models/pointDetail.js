@@ -1,4 +1,5 @@
 var mongoose = require('mongoose');
+var Schema = mongoose.Schema;
 
 var PointDetail = mongoose.model("PointDetail", new mongoose.Schema({
   idAccount : Number,
