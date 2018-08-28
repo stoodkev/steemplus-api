@@ -322,6 +322,33 @@ var appRouter = function (app) {
       nbPoints : 0
     });
 
+    var type1 = new TypeTransaction ({
+      name : "MinnowBooster"
+    });
+    var type2 = new TypeTransaction ({
+      name : "PostPromoter"
+    });
+    var type3 = new TypeTransaction ({
+      name : "Beneficiaries"
+    });
+    var type4 = new TypeTransaction ({
+      name : "Donation"
+    });
+    var type5 = new TypeTransaction ({
+      name : "DTube"
+    });
+    var type6 = new TypeTransaction ({
+      name : "Utopian"
+    });
+
+    type1.save(function (err) {if (err) console.log ('Error on save!')});
+    type2.save(function (err) {if (err) console.log ('Error on save!')});
+    type3.save(function (err) {if (err) console.log ('Error on save!')});
+    type4.save(function (err) {if (err) console.log ('Error on save!')});
+    type5.save(function (err) {if (err) console.log ('Error on save!')});
+    type6.save(function (err) {if (err) console.log ('Error on save!')});
+
+
     TypeTransaction.find({}).exec(function(err, result) {
       if (!err) {
         console.log(result);
