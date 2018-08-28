@@ -3,7 +3,6 @@ let sql=require("mssql");
 let steem=require("steem");
 let utils=require("../utils");
 var getJSON = require('get-json');
-var mongoose = require("mongoose");
 
 var lastPermlink=null;
 var appRouter = function (app) {
