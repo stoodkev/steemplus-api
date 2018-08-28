@@ -4,8 +4,7 @@ var routes = require("./routes/routes.js");
 var app = express();
 require('dotenv').config();
 var RateLimit = require('express-rate-limit');
-var mongodb = require("mongodb");
-var ObjectID = mongodb.ObjectID;
+var mongoose = require ("mongoose");
 
 var TypeTransactionCollection = "TypeTransaction";
 var UserCollection = "User";
@@ -27,20 +26,16 @@ app.use(limiter);
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-mongodb.MongoClient.connect(process.env.MONGODB_URI, function (err, client) {
-  if (err) {
-    console.log(err);
-    process.exit(1);
+mongoose.connect(process.env.MONGODB_URI, function (err, res) {
+  if (err) 
+  {
+    console.log ('ERROR connecting to: ' + uristring + '. ' + err);
+  } else 
+  {
+    var server = app.listen(process.env.PORT||3000, function () {
+      console.log("app running on port ", server.address().port);
+    });
+    console.log ('Succeeded connected to: ' + uristring);
   }
-
-  // Save database object from the callback for reuse.
-  db = client.db();
-  console.log("Database connection ready");
-
-  // Initialize the app.
-  var server = app.listen(process.env.PORT||3000, function () {
-    console.log("app running on port ", server.address().port);
-  });
 });
-
 routes(app);
