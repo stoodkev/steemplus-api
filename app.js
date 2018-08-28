@@ -35,7 +35,7 @@ mongoose.connect(process.env.MONGODB_URI||'http://ds133152.mlab.com:33152/heroku
     var server = app.listen(process.env.PORT||3000, function () {
       console.log("app running on port ", server.address().port);
     });
-    console.log ('Succeeded connected to: ' + uristring);
+    console.log ('Succeeded connected to: ' + process.env.MONGODB_URI);
   }
 });
 routes(app);

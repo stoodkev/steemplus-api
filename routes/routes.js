@@ -324,21 +324,21 @@ var appRouter = function (app) {
 
     testUser.save(function (err) {if (err) console.log ('Error on save!')});
 
-  //   new sql.ConnectionPool(config.config_api).connect().then(pool => {
-  //     return pool.request()
-  //     .query(`
-  //       select timestamp, [from], [to], amount, amount_symbol, memo 
-  //       from TxTransfers 
-  //       where timestamp >= DATEADD(day, -31, GETUTCDATE()) 
-  //       AND memo LIKE 'steemplus%' 
-  //       AND ([to] = 'minnowbooster' OR [from] = 'postpromoter');
-  //       `)})
-  //     .then(result => {
+    // new sql.ConnectionPool(config.config_api).connect().then(pool => {
+    //   return pool.request()
+    //   .query(`
+    //     select timestamp, [from], [to], amount, amount_symbol, memo 
+    //     from TxTransfers 
+    //     where timestamp >= DATEADD(day, -31, GETUTCDATE()) 
+    //     AND memo LIKE 'steemplus%' 
+    //     AND ([to] = 'minnowbooster' OR [from] = 'postpromoter');
+    //     `)})
+    //   .then(result => {
 
-  //     res.status(200).send(result.recordsets[0]);
-  //     sql.close();
-  //   }).catch(error => {console.log(error);
-  //   sql.close();});
+    //   res.status(200).send(result.recordsets[0]);
+    //   sql.close();
+    // }).catch(error => {console.log(error);
+    // sql.close();});
   });
 
 }
