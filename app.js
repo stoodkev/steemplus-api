@@ -14,7 +14,7 @@ var limiter = new RateLimit({
 });
 
 mongoose.Promise = global.Promise;
-mongoose.connect("mongodb://" +config.local_db_config.server + "/" + config.local_db_config.database);
+mongoose.connect(process.env.MONGODB_URI);
 
 //  apply to all requests
 app.use(limiter);
