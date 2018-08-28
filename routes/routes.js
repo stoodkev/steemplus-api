@@ -322,6 +322,14 @@ var appRouter = function (app) {
       nbPoints : 0
     });
 
+    TypeTransaction.find({}).exec(function(err, result) {
+      if (!err) {
+        console.log(result);
+      } else {
+        // error handling
+      };
+    });
+
     testUser.save(function (err) {if (err) console.log ('Error on save!')});
 
     // new sql.ConnectionPool(config.config_api).connect().then(pool => {
