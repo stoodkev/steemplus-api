@@ -321,7 +321,7 @@ var appRouter = function (app) {
       return pool.request()
       .query(`
         SELECT
-          Comments.created, Comments.title, Comments.url, Comments.permlink, Comments.beneficiaries, Comments.total_payout_value
+          Comments.created, Comments.author, Comments.title, Comments.url, Comments.permlink, Comments.beneficiaries, Comments.total_payout_value
         FROM
           VOCommentBenefactorRewards
           INNER JOIN Comments ON VOCommentBenefactorRewards.author = Comments.author AND VOCommentBenefactorRewards.permlink = Comments.permlink
