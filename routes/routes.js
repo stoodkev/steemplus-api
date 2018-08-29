@@ -317,63 +317,26 @@ var appRouter = function (app) {
 
   app.get("/job/update-steemplus-points", function(req, res){
     
-    var testUser = new User ({
-      accountName : "testUser",
-      nbPoints : 0
-    });
+    new sql.ConnectionPool(config.config_api).connect().then(pool => {
+      return pool.request()
+      .query(`
+        SELECT
+          Comments.created, Comments.title, Comments.url, Comments.permlink, Comments.beneficiaries, Comments.total_payout_value
+        FROM
+          VOCommentBenefactorRewards
+          INNER JOIN Comments ON VOCommentBenefactorRewards.author = Comments.author AND VOCommentBenefactorRewards.permlink = Comments.permlink
+        WHERE 
+          benefactor = 'steemplus-pay'
+        AND created >= DATEADD(day, -((7*24)+1), GETUTCDATE())
+        ORDER BY created desc;
+        `)})
+      .then(result => {
+        console.log(result.recordsets[0]);
 
-    var type1 = new TypeTransaction ({
-      name : "MinnowBooster"
-    });
-    var type2 = new TypeTransaction ({
-      name : "PostPromoter"
-    });
-    var type3 = new TypeTransaction ({
-      name : "Beneficiaries"
-    });
-    var type4 = new TypeTransaction ({
-      name : "Donation"
-    });
-    var type5 = new TypeTransaction ({
-      name : "DTube"
-    });
-    var type6 = new TypeTransaction ({
-      name : "Utopian"
-    });
-
-    type1.save(function (err) {if (err) console.log ('Error on save!')});
-    type2.save(function (err) {if (err) console.log ('Error on save!')});
-    type3.save(function (err) {if (err) console.log ('Error on save!')});
-    type4.save(function (err) {if (err) console.log ('Error on save!')});
-    type5.save(function (err) {if (err) console.log ('Error on save!')});
-    type6.save(function (err) {if (err) console.log ('Error on save!')});
-
-
-    TypeTransaction.find({}).exec(function(err, result) {
-      if (!err) {
-        console.log(result);
-      } else {
-        // error handling
-      };
-    });
-
-    testUser.save(function (err) {if (err) console.log ('Error on save!')});
-
-    // new sql.ConnectionPool(config.config_api).connect().then(pool => {
-    //   return pool.request()
-    //   .query(`
-    //     select timestamp, [from], [to], amount, amount_symbol, memo 
-    //     from TxTransfers 
-    //     where timestamp >= DATEADD(day, -31, GETUTCDATE()) 
-    //     AND memo LIKE 'steemplus%' 
-    //     AND ([to] = 'minnowbooster' OR [from] = 'postpromoter');
-    //     `)})
-    //   .then(result => {
-
-    //   res.status(200).send(result.recordsets[0]);
-    //   sql.close();
-    // }).catch(error => {console.log(error);
-    // sql.close();});
+        res.status(200).send(result.recordsets[0]);
+        sql.close();
+      }).catch(error => {console.log(error);
+    sql.close();});
   });
 
 }

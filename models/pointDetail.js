@@ -7,6 +7,6 @@ var PointDetail = mongoose.model("PointDetail", new mongoose.Schema({
   permlink : Number,
   typeTransaction : {type: Schema.Types.ObjectId, ref: 'TypeTransaction'},
   user : {type: Schema.Types.ObjectId, ref: 'User'}
-}));
+}, { collection : 'pointsdetails' }));
 
 module.exports = PointDetail;
