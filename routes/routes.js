@@ -319,7 +319,7 @@ var appRouter = function (app) {
 
   app.get("/api/get-steemplus-points/:username", function(req, res){
     let paramUsername = req.params.username;
-    User.findOne({accountName: paramUsername}, function(err, user){
+    User.find({accountName: paramUsername}).populate('pointsDetails').exec(function(err, user){
       if(err) res.status(520).send('Error');
       else res.status(200).send(user);
     });
