@@ -2,9 +2,9 @@ var mongoose = require('mongoose');
 var Schema = mongoose.Schema;
 
 var User = mongoose.model("User", new mongoose.Schema({
-  accountName : String,
+  accountName : {type: String, unique: true},
   nbPoints : Number,
-  PointDetails : [{type: Schema.Types.ObjectId, ref: 'PointDetail'}]
+  pointsDetails : [{type: Schema.Types.ObjectId, ref: 'PointsDetail'}]
 },{ collection : 'users' }));
 
 module.exports = User;

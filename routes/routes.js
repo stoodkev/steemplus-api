@@ -4,8 +4,10 @@ let steem=require("steem");
 let utils=require("../utils");
 var getJSON = require('get-json');
 var User = require('../models/user');
-var PointDetail = require('../models/pointDetail');
+var PointsDetail = require('../models/pointsDetail');
 var TypeTransaction = require('../models/typeTransaction');
+var totalVests = null;
+var totalSteem = null;
 
 var lastPermlink=null;
 var appRouter = function (app) {
@@ -316,30 +318,139 @@ var appRouter = function (app) {
   });
 
   app.get("/job/update-steemplus-points", function(req, res){
-    
-    new sql.ConnectionPool(config.config_api).connect().then(pool => {
-      return pool.request()
-      .query(`
-        SELECT
-          Comments.created, Comments.author, Comments.title, Comments.url, Comments.permlink, Comments.beneficiaries, Comments.total_payout_value
-        FROM
-          VOCommentBenefactorRewards
-          INNER JOIN Comments ON VOCommentBenefactorRewards.author = Comments.author AND VOCommentBenefactorRewards.permlink = Comments.permlink
-        WHERE 
-          benefactor = 'steemplus-pay'
-        AND created >= DATEADD(day, -((7*24)+1), GETUTCDATE())
-        ORDER BY created desc;
-        `)})
-      .then(result => {
-        console.log(result.recordsets[0]);
+    Promise.all([steem.api.getDynamicGlobalPropertiesAsync()])
+    .then(async function(values)
+    {
+      totalSteem = totalSteem = Number(values["0"].total_vesting_fund_steem.split(' ')[0]);
+      totalVests = Number(values["0"].total_vesting_shares.split(' ')[0]);
 
-        res.status(200).send(result.recordsets[0]);
-        sql.close();
-      }).catch(error => {console.log(error);
-    sql.close();});
+      var lastEntry = await PointsDetail.find({requestType: 0}).sort({timestamp: -1}).limit(1);
+      var lastEntryDate = null;
+      if(lastEntry[0] !== undefined)
+        lastEntryDate = lastEntry[0].timestampString;
+      else
+      lastEntryDate = '2018-08-03 12:05:42.000'; // This date is the steemplus point annoncement day
+      await new sql.ConnectionPool(config.config_api).connect().then(pool => {
+        return pool.request()
+        .query(`
+          SELECT
+            REPLACE(VOCommentBenefactorRewards.reward, ' VESTS', '') as reward, Comments.created, Comments.author, Comments.title, Comments.url, Comments.permlink, Comments.beneficiaries, Comments.total_payout_value
+          FROM
+            VOCommentBenefactorRewards
+            INNER JOIN Comments ON VOCommentBenefactorRewards.author = Comments.author AND VOCommentBenefactorRewards.permlink = Comments.permlink
+          WHERE 
+            benefactor = 'steemplus-pay'
+          AND created > CONVERT(datetime, '${lastEntryDate}')
+          ORDER BY created ASC;
+          `)})
+        .then(result => {
+          var comments = result.recordsets[0];
+          updateSteemplusPointsComments(comments, totalSteem, totalVests);
+          sql.close();
+        }).catch(error => {console.log(error);
+      sql.close();});
+
+      lastEntry = await PointsDetail.find({requestType: 1}).sort({timestamp: -1}).limit(1);
+      var lastEntryDate = null;
+      if(lastEntry[0] !== undefined)
+        lastEntryDate = lastEntry[0].timestampString;
+      else
+      lastEntryDate = '2018-08-03 12:05:42.000'; // This date is the steemplus point annoncement day
+      await new sql.ConnectionPool(config.config_api).connect().then(pool => {
+        return pool.request()
+        .query(`
+          select timestamp, [from], [to], amount, amount_symbol, memo 
+          from TxTransfers 
+          where timestamp > CONVERT(datetime, '${lastEntryDate}') 
+          AND memo LIKE 'steemplus%' 
+          AND ([to] = 'minnowbooster' OR [from] = 'postpromoter');
+          `)})
+        .then(result => {
+          var transfers = result.recordsets[0];
+          updateSteemplusPointsTransfers(transfers);
+          res.status(200).send("OK");
+          sql.close();
+        }).catch(error => {console.log(error);
+      sql.close();});
+    });
   });
 
 }
 
+async function updateSteemplusPointsTransfers(transfers)
+{
+  var nbPointDetailsAdded = 0;
+  console.log(`Adding ${transfers.length} new transfer(s) to DB`);
+  for (const transfer of transfers) {
+    var user = await User.findOne({accountName: transfer.from});
+    if(user === null)
+    {
+      user = new User({accountName: transfer.from, nbPoints: 0});
+      user = await user.save();
+    }
+
+    // Get type
+    var type = 'default';
+    if(transfer.to === 'minnowbooster')
+      type = await TypeTransaction.findOne({name: 'MinnowBooster'});
+    else if(comment.beneficiaries.includes('utopian.pay'))
+      type = await TypeTransaction.findOne({name: 'PostPromoter'});
+
+    var amount = transfer.amount * 0.01;
+    var nbPoints = amount * 100;
+    var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: transfer.amount_symbol, permlink: '', user: user._id, typeTransaction: type._id, timestamp: transfer.timestamp, timestampString: utils.formatDate(transfer.timestamp), requestType: 1});
+    pointsDetail = await pointsDetail.save();
+    await PointsDetail.find({}).populate('user').exec(function (err, pointD) {if (err) console.log(`populate user error : ${err}`);});
+    await PointsDetail.find({}).populate('typeTransaction').exec(function (err, tt) {if (err) console.log(`populate typeTransaction error : ${err}`);});
+    user.pointsDetails.push(pointsDetail);
+    user.nbPoints = user.nbPoints + nbPoints;
+    await user.save(function (err) {});
+    await User.find({}).populate('pointsDetails').exec(function (err, person) {if (err) console.log(`populate pointsDetails error : ${err}`);});
+    nbPointDetailsAdded++;
+  }
+  console.log(`Added ${nbPointDetailsAdded} pointDetail(s)`);
+}
+
+async function updateSteemplusPointsComments(comments, totalSteem, totalVests)
+{
+  var nbPointDetailsAdded = 0;
+  console.log(`Adding ${comments.length} new comment(s) to DB`);
+  for (const comment of comments) {
+    var user = await User.findOne({accountName: comment.author});
+    // console.log(`after findOne ${comment.author} => ${user}`);
+    if(user === null)
+    {
+      user = new User({accountName: comment.author, nbPoints: 0});
+      user = await user.save();
+    }
+    // Get type
+    var type = 'default';
+    if(comment.beneficiaries.includes('dtube.pay'))
+      type = await TypeTransaction.findOne({name: 'DTube'});
+    else if(comment.beneficiaries.includes('utopian.pay'))
+      type = await TypeTransaction.findOne({name: 'Utopian.io'});
+    else
+    {
+      var benefs = JSON.parse(comment.beneficiaries);
+      if(benefs.length > 1)
+        type = await TypeTransaction.findOne({name: 'Beneficiaries'}); 
+      else
+        type = await TypeTransaction.findOne({name: 'Donation'}); 
+    }
+
+    var amount = steem.formatter.vestToSteem(parseFloat(comment.reward), totalVests, totalSteem).toFixed(3);
+    var nbPoints = amount*100.0;
+    var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: 'SP', permlink: comment.permlink, user: user._id, typeTransaction: type._id, timestamp: comment.created, timestampString: utils.formatDate(comment.created), requestType: 0});
+    pointsDetail = await pointsDetail.save();
+    await PointsDetail.find({}).populate('user').exec(function (err, pointD) {if (err) console.log(`populate user error : ${err}`);});
+    await PointsDetail.find({}).populate('typeTransaction').exec(function (err, tt) {if (err) console.log(`populate typeTransaction error : ${err}`);});
+    user.pointsDetails.push(pointsDetail);
+    user.nbPoints = user.nbPoints + nbPoints;
+    await user.save(function (err) {});
+    await User.find({}).populate('pointsDetails').exec(function (err, person) {if (err) console.log(`populate pointsDetails error : ${err}`);});
+    nbPointDetailsAdded++;
+  }
+  console.log(`Added ${nbPointDetailsAdded} pointDetail(s)`);
+}
 
 module.exports = appRouter;

@@ -25,8 +25,8 @@ app.use(limiter);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-console.log(process.env.MONGODB_URI);
-mongoose.connect(process.env.MONGODB_URI||'http://ds133152.mlab.com:33152/heroku_fl6ldd26', function (err, res) {
+var uristring = process.env.MONGODB_URI||'mongodb://127.0.0.1:27017/heroku_fl6ldd26';
+mongoose.connect(uristring, function (err, res) {
   if (err) 
   {
     console.log ('ERROR connecting to: ' + uristring + '. ' + err);
@@ -35,7 +35,7 @@ mongoose.connect(process.env.MONGODB_URI||'http://ds133152.mlab.com:33152/heroku
     var server = app.listen(process.env.PORT||3000, function () {
       console.log("app running on port ", server.address().port);
     });
-    console.log ('Succeeded connected to: ' + process.env.MONGODB_URI);
+    console.log ('Succeeded connected to: ' + uristring);
   }
 });
 routes(app);
