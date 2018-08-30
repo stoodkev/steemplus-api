@@ -317,6 +317,14 @@ var appRouter = function (app) {
     }
   });
 
+  app.get("/api/get-steemplus-points/:username", function(req, res){
+    let paramUsername = req.params.username;
+    User.findOne({accountName: paramUsername}, function(err, user){
+      if(err) res.status(520).send('Error');
+      else res.status(200).send(user);
+    });
+  });
+
   app.get("/job/update-steemplus-points", function(req, res){
     Promise.all([steem.api.getDynamicGlobalPropertiesAsync()])
     .then(async function(values)
@@ -359,9 +367,9 @@ var appRouter = function (app) {
       await new sql.ConnectionPool(config.config_api).connect().then(pool => {
         return pool.request()
         .query(`
-          select timestamp, [from], [to], amount, amount_symbol, memo 
-          from TxTransfers 
-          where timestamp > CONVERT(datetime, '${lastEntryDate}') 
+          SELECT timestamp, [from], [to], amount, amount_symbol, memo 
+          FROM TxTransfers 
+          WHERE timestamp > CONVERT(datetime, '${lastEntryDate}') 
           AND memo LIKE 'steemplus%' 
           AND ([to] = 'minnowbooster' OR [from] = 'postpromoter');
           `)})
