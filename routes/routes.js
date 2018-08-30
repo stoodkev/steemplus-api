@@ -437,7 +437,8 @@ async function updateSteemplusPointsComments(comments, totalSteem, totalVests)
       else
         type = await TypeTransaction.findOne({name: 'Donation'}); 
     }
-
+    console.log(type);
+    console.log(user);
     var amount = steem.formatter.vestToSteem(parseFloat(comment.reward), totalVests, totalSteem).toFixed(3);
     var nbPoints = amount*100.0;
     var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: 'SP', permlink: comment.permlink, user: user._id, typeTransaction: type._id, timestamp: comment.created, timestampString: utils.formatDate(comment.created), requestType: 0});
