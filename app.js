@@ -25,7 +25,7 @@ app.use(limiter);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-var uristring = process.env.MONGODB_URI||'mongodb://127.0.0.1:27017/heroku_fl6ldd26';
+var uristring = process.env.MONGOLAB_PINK_URI || process.env.MONGODB_URI||'mongodb://127.0.0.1:27017/heroku_fl6ldd26';
 mongoose.connect(uristring, function (err, res) {
   if (err) 
   {
