@@ -460,14 +460,11 @@ async function updateSteemplusPointsComments(comments, totalSteem, totalVests)
 
     var amount = steem.formatter.vestToSteem(parseFloat(comment.reward), totalVests, totalSteem).toFixed(3);
     var nbPoints = amount*100.0;
-    var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: 'SP', permlink: comment.permlink, url:comment.permlink, title:comment.title, user: user._id, typeTransaction: type._id, timestamp: comment.created, timestampString: utils.formatDate(comment.created), requestType: 0});
+    var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: 'SP', permlink: comment.permlink, url:comment.url, title:comment.title, user: user._id, typeTransaction: type._id, timestamp: comment.created, timestampString: utils.formatDate(comment.created), requestType: 0});
     pointsDetail = await pointsDetail.save();
-    await PointsDetail.find({}).populate('user').exec(function (err, pointD) {if (err) console.log(`populate user error : ${err}`);});
-    await PointsDetail.find({}).populate('typeTransaction').exec(function (err, tt) {if (err) console.log(`populate typeTransaction error : ${err}`);});
     user.pointsDetails.push(pointsDetail);
     user.nbPoints = user.nbPoints + nbPoints;
     await user.save(function (err) {});
-    await User.find({}).populate('pointsDetails').exec(function (err, person) {if (err) console.log(`populate pointsDetails error : ${err}`);});
     nbPointDetailsAdded++;
   }
   console.log(`Added ${nbPointDetailsAdded} pointDetail(s)`);
