@@ -6,6 +6,8 @@ var PointsDetail = mongoose.model("PointsDetail", new mongoose.Schema({
   amount: Number,
   amountSymbol: String,
   permlink : String,
+  url : String,
+  title : String,
   typeTransaction : {type: Schema.Types.ObjectId, ref: 'TypeTransaction'},
   user : {type: Schema.Types.ObjectId, ref: 'User'},
   timestamp: Date,
