@@ -8,7 +8,7 @@ var PointsDetail = require('../models/pointsDetail');
 var TypeTransaction = require('../models/typeTransaction');
 var totalVests = null;
 var totalSteem = null;
-var SBDperSteem = null;
+var ratioSBDSteem = null;
 
 var lastPermlink=null;
 var appRouter = function (app) {
@@ -342,7 +342,7 @@ var appRouter = function (app) {
       totalSteem = totalSteem = Number(values["0"].total_vesting_fund_steem.split(' ')[0]);
       totalVests = Number(values["0"].total_vesting_shares.split(' ')[0]);
       // Calculate ration SBD/Steem
-      SBDperSteem = values[2] / values[1];
+      ratioSBDSteem = values[2] / values[1];
 
       // Get the last entry the requestType 0 (Comments)
       var lastEntry = await PointsDetail.find({requestType: 0}).sort({timestamp: -1}).limit(1);
@@ -427,7 +427,7 @@ async function updateSteemplusPointsTransfers(transfers)
     var type = 'default';
     if(transfer.to === 'minnowbooster')
       type = await TypeTransaction.findOne({name: 'MinnowBooster'});
-    else if(comment.beneficiaries.includes('utopian.pay'))
+    else if(transfer.to === 'postpromoter')
       type = await TypeTransaction.findOne({name: 'PostPromoter'});
 
     // Get the amount of the transfer
@@ -437,7 +437,7 @@ async function updateSteemplusPointsTransfers(transfers)
     if(transfer.amount_symbol === "SBD")
       nbPoints = amount * 100;
     else if(transfer.amount_symbol === "STEEM")
-      nbPoints = amount * SBDperSteem * 100;
+      nbPoints = amount * ratioSBDSteem * 100;
     // Create new PointsDetail entry
     var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: transfer.amount_symbol, permlink: '', user: user._id, typeTransaction: type._id, timestamp: transfer.timestamp, timestampString: utils.formatDate(transfer.timestamp), requestType: 1});
     pointsDetail = await pointsDetail.save();
@@ -491,7 +491,7 @@ async function updateSteemplusPointsComments(comments, totalSteem, totalVests)
     // Get the amount of the transaction
     var amount = steem.formatter.vestToSteem(parseFloat(comment.reward), totalVests, totalSteem).toFixed(3);
     // Get the number of Steemplus points
-    var nbPoints = amount * SBDperSteem * 100;
+    var nbPoints = amount * ratioSBDSteem * 100;
     var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: 'SP', permlink: comment.permlink, url:comment.url, title:comment.title, user: user._id, typeTransaction: type._id, timestamp: comment.created, timestampString: utils.formatDate(comment.created), requestType: 0});
     pointsDetail = await pointsDetail.save();
     // Update user acccount's points
