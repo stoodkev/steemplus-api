@@ -317,27 +317,40 @@ var appRouter = function (app) {
     }
   });
 
+
+  // Function used to get the details of an account. 
+  // @parameter username : account name
+  // Return the number of points of an account and other information as the detail of every entry of steemplus point
   app.get("/api/get-steemplus-points/:username", function(req, res){
     let paramUsername = req.params.username;
+    // The populate function helps giving the full information instead of the id of the "typeTransaction" or "pointsDetails"
     User.find({accountName: paramUsername}).populate({path: 'pointsDetails', populate: {path: 'typeTransaction'}}).exec(function(err, user){
       if(err) res.status(520).send('Error');
       else res.status(200).send(user);
     });
   });
 
+  // This function is used to update steemplus point. 
+  // Function executed every hour.
+  // Only get the results since the last entry.
   app.get("/job/update-steemplus-points", function(req, res){
+    // Get dynamic properties of steem to be able to calculate prices
     Promise.all([steem.api.getDynamicGlobalPropertiesAsync()])
     .then(async function(values)
     {
       totalSteem = totalSteem = Number(values["0"].total_vesting_fund_steem.split(' ')[0]);
       totalVests = Number(values["0"].total_vesting_shares.split(' ')[0]);
 
+      // Get the last entry the requestType 0 (Comments)
       var lastEntry = await PointsDetail.find({requestType: 0}).sort({timestamp: -1}).limit(1);
+      // Get the creation date of the last entry
       var lastEntryDate = null;
       if(lastEntry[0] !== undefined)
         lastEntryDate = lastEntry[0].timestampString;
       else
-      lastEntryDate = '2018-08-03 12:05:42.000'; // This date is the steemplus point annoncement day
+        lastEntryDate = '2018-08-03 12:05:42.000'; // This date is the steemplus point annoncement day
+      // Wait for SteemSQL's query result before starting the second request
+      // We decided to wait to be sure this function won't try to update the same row twice at the same time
       await new sql.ConnectionPool(config.config_api).connect().then(pool => {
         return pool.request()
         .query(`
@@ -352,18 +365,22 @@ var appRouter = function (app) {
           ORDER BY created ASC;
           `)})
         .then(result => {
+          // get result
           var comments = result.recordsets[0];
+          // Start data processing
           updateSteemplusPointsComments(comments, totalSteem, totalVests);
           sql.close();
         }).catch(error => {console.log(error);
       sql.close();});
 
+      // Get the last entry for the second request type (Transfers : MinnowBooster or Postpromoter)
       lastEntry = await PointsDetail.find({requestType: 1}).sort({timestamp: -1}).limit(1);
       var lastEntryDate = null;
       if(lastEntry[0] !== undefined)
         lastEntryDate = lastEntry[0].timestampString;
       else
       lastEntryDate = '2018-08-03 12:05:42.000'; // This date is the steemplus point annoncement day
+      // Execute SteemSQL query
       await new sql.ConnectionPool(config.config_api).connect().then(pool => {
         return pool.request()
         .query(`
@@ -385,14 +402,20 @@ var appRouter = function (app) {
 
 }
 
+// Function used to process the data from SteemSQL for requestType == 1
+// @parameter transfers : transfers data received from SteemSQL
 async function updateSteemplusPointsTransfers(transfers)
 {
+  // Number of new entry in the DB
   var nbPointDetailsAdded = 0;
   console.log(`Adding ${transfers.length} new transfer(s) to DB`);
+  // Iterate on transfers
   for (const transfer of transfers) {
+    // Check if user is already in DB
     var user = await User.findOne({accountName: transfer.from});
     if(user === null)
     {
+      // If not, create it
       user = new User({accountName: transfer.from, nbPoints: 0});
       user = await user.save();
     }
@@ -404,33 +427,45 @@ async function updateSteemplusPointsTransfers(transfers)
     else if(comment.beneficiaries.includes('utopian.pay'))
       type = await TypeTransaction.findOne({name: 'PostPromoter'});
 
-    var amount = transfer.amount * 0.01;
+    // Get the amount of the transfer
+    var amount = transfer.amount * 0.01; //Steemplus take 1% of the transaction
+    // We decided that 1SPP == 0.01 SBD
     var nbPoints = amount * 100;
+    // Create new PointsDetail entry
     var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: transfer.amount_symbol, permlink: '', user: user._id, typeTransaction: type._id, timestamp: transfer.timestamp, timestampString: utils.formatDate(transfer.timestamp), requestType: 1});
     pointsDetail = await pointsDetail.save();
-    await PointsDetail.find({}).populate('user').exec(function (err, pointD) {if (err) console.log(`populate user error : ${err}`);});
-    await PointsDetail.find({}).populate('typeTransaction').exec(function (err, tt) {if (err) console.log(`populate typeTransaction error : ${err}`);});
+    
+    // Update user account
     user.pointsDetails.push(pointsDetail);
     user.nbPoints = user.nbPoints + nbPoints;
     await user.save(function (err) {});
-    await User.find({}).populate('pointsDetails').exec(function (err, person) {if (err) console.log(`populate pointsDetails error : ${err}`);});
     nbPointDetailsAdded++;
   }
   console.log(`Added ${nbPointDetailsAdded} pointDetail(s)`);
 }
 
+// Function used to process the data from SteemSQL for requestType == 0
+// @parameter comments : posts data received from SteemSQL
+// @parameter totalSteem : dynamic value from the blockchain
+// @parameter totalVests : dynamic value from the blockchain
 async function updateSteemplusPointsComments(comments, totalSteem, totalVests)
 {
+  // Number of new entry in the DB
   var nbPointDetailsAdded = 0;
   console.log(`Adding ${comments.length} new comment(s) to DB`);
+  // Iterate on transfers
   for (const comment of comments) {
+    
+    // Check if user is already in DB
     var user = await User.findOne({accountName: comment.author});
-    // console.log(`after findOne ${comment.author} => ${user}`);
     if(user === null)
     {
+      // If not create it
       user = new User({accountName: comment.author, nbPoints: 0});
+      // Need to wait for the creation to be done to be able to use the object
       user = await user.save();
     }
+    
     // Get type
     var type = 'default';
     if(comment.beneficiaries.includes('dtube.pay'))
@@ -446,22 +481,13 @@ async function updateSteemplusPointsComments(comments, totalSteem, totalVests)
         type = await TypeTransaction.findOne({name: 'Donation'}); 
     }
 
-    if(type === null) 
-    {
-      console.log("type null");
-      console.log(comment);
-    }
-
-    if(user === null) 
-    {
-      console.log("user null");
-      console.log(comment);
-    }
-
+    // Get the amount of the transaction
     var amount = steem.formatter.vestToSteem(parseFloat(comment.reward), totalVests, totalSteem).toFixed(3);
+    // Get the number of Steemplus points
     var nbPoints = amount*100.0;
     var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: 'SP', permlink: comment.permlink, url:comment.url, title:comment.title, user: user._id, typeTransaction: type._id, timestamp: comment.created, timestampString: utils.formatDate(comment.created), requestType: 0});
     pointsDetail = await pointsDetail.save();
+    // Update user acccount's points
     user.pointsDetails.push(pointsDetail);
     user.nbPoints = user.nbPoints + nbPoints;
     await user.save(function (err) {});
