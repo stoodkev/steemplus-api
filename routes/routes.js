@@ -400,6 +400,65 @@ var appRouter = function (app) {
     });
   });
 
+  // Bot for Steemplus daily vote
+  app.get("/job/bot-vote", function(req, res){
+    // get Steem-plus voting power
+    steem.api.getAccounts(["steem-plus"], function(err, result) {
+      if (err) console.log(err);
+      else 
+      {
+        let spAccount = result[0];
+        // Only start voting if the voting power is full
+        if(spAccount.voting_power !== 10000)
+        {
+          User.find({nbPoints: {$gt: 0}}, 'accountName', function(err, users){
+            if(err) console.log(`Error while getting users : ${err}`);
+            else
+            {
+              let usernameList = [];
+              users.map((user) => usernameList.push(`'${user.accountName}'`));
+              new sql.ConnectionPool(config.config_api).connect().then(pool => {
+              return pool.request()
+              .query(`
+                SELECT permlink, title, Comments.author, url
+                FROM Comments
+                INNER JOIN
+                (
+                  SELECT author, max(created) as maxDate
+                  FROM Comments 
+                  WHERE depth = 0 
+                  AND author IN (${usernameList.join(',')})
+                  AND created >= DATEADD(hour,-24, GETUTCDATE())
+                  GROUP BY author
+                ) t
+                ON Comments.author = t.author
+                AND created = t.maxDate;
+                `)})
+              .then(result => {
+                var posts = result.recordsets[0];
+                votingRoutine(spAccount, posts);
+                res.status(200).send("OK");
+                sql.close();
+              }).catch(error => {console.log(error);
+            sql.close();});
+            }
+          });
+        }
+        else
+          console.log(`Voting power is only ${spAccount.voting_power/100.00}%... Need to way more`);
+
+      }
+    });
+  });
+
+}
+
+// Function used to process the voting routine
+// @parameter spAccount : SteemPlus account
+// @parameter posts : posts that have to be voted for
+function votingRoutine(spAccount, posts)
+{
+  console.log(posts);
 }
 
 // Function used to process the data from SteemSQL for requestType == 1
