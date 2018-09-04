@@ -334,7 +334,14 @@ var appRouter = function (app) {
   // This function is used to update steemplus point. 
   // Function executed every hour.
   // Only get the results since the last entry.
-  app.get("/job/update-steemplus-points", function(req, res){
+  app.get("/job/update-steemplus-points/:key", function(req, res)
+  {
+    // If key is not the right key, permission denied and return
+    if(req.params.key !== config.key)
+    {
+      res.status(403).send("Permission denied");
+      return;
+    }
     // Get dynamic properties of steem to be able to calculate prices
     Promise.all([steem.api.getDynamicGlobalPropertiesAsync(), getPriceSBDAsync(), getPriceSteemAsync()])
     .then(async function(values)
