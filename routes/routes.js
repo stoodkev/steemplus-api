@@ -8,6 +8,7 @@ var PointsDetail = require('../models/pointsDetail');
 var TypeTransaction = require('../models/typeTransaction');
 var totalVests = null;
 var totalSteem = null;
+var SBDperSteem = null;
 
 var lastPermlink=null;
 var appRouter = function (app) {
@@ -335,11 +336,13 @@ var appRouter = function (app) {
   // Only get the results since the last entry.
   app.get("/job/update-steemplus-points", function(req, res){
     // Get dynamic properties of steem to be able to calculate prices
-    Promise.all([steem.api.getDynamicGlobalPropertiesAsync()])
+    Promise.all([steem.api.getDynamicGlobalPropertiesAsync(), getPriceSBDAsync(), getPriceSteemAsync()])
     .then(async function(values)
     {
       totalSteem = totalSteem = Number(values["0"].total_vesting_fund_steem.split(' ')[0]);
       totalVests = Number(values["0"].total_vesting_shares.split(' ')[0]);
+      // Calculate ration SBD/Steem
+      SBDperSteem = values[2] / values[1];
 
       // Get the last entry the requestType 0 (Comments)
       var lastEntry = await PointsDetail.find({requestType: 0}).sort({timestamp: -1}).limit(1);
@@ -489,7 +492,11 @@ async function updateSteemplusPointsTransfers(transfers)
     // Get the amount of the transfer
     var amount = transfer.amount * 0.01; //Steemplus take 1% of the transaction
     // We decided that 1SPP == 0.01 SBD
-    var nbPoints = amount * 100;
+    var nbPoints = 0;
+    if(transfer.amount_symbol === "SBD")
+      nbPoints = amount * 100;
+    else if(transfer.amount_symbol === "STEEM")
+      nbPoints = amount * SBDperSteem * 100;
     // Create new PointsDetail entry
     var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: transfer.amount_symbol, permlink: '', user: user._id, typeTransaction: type._id, timestamp: transfer.timestamp, timestampString: utils.formatDate(transfer.timestamp), requestType: 1});
     pointsDetail = await pointsDetail.save();
@@ -543,7 +550,7 @@ async function updateSteemplusPointsComments(comments, totalSteem, totalVests)
     // Get the amount of the transaction
     var amount = steem.formatter.vestToSteem(parseFloat(comment.reward), totalVests, totalSteem).toFixed(3);
     // Get the number of Steemplus points
-    var nbPoints = amount*100.0;
+    var nbPoints = amount * SBDperSteem * 100;
     var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: 'SP', permlink: comment.permlink, url:comment.url, title:comment.title, user: user._id, typeTransaction: type._id, timestamp: comment.created, timestampString: utils.formatDate(comment.created), requestType: 0});
     pointsDetail = await pointsDetail.save();
     // Update user acccount's points
@@ -553,6 +560,24 @@ async function updateSteemplusPointsComments(comments, totalSteem, totalVests)
     nbPointDetailsAdded++;
   }
   console.log(`Added ${nbPointDetailsAdded} pointDetail(s)`);
+}
+
+// Function used to get Steem Price
+function getPriceSteemAsync() {
+    return new Promise(function(resolve, reject) {
+        getJSON('https://bittrex.com/api/v1.1/public/getticker?market=BTC-STEEM', function(err, response){
+          resolve(response.result['Bid']);
+        });
+    });
+}
+
+// Function used to get SBD price
+function getPriceSBDAsync() {
+    return new Promise(function(resolve, reject) {
+        getJSON('https://bittrex.com/api/v1.1/public/getticker?market=BTC-SBD', function(err, response){
+          resolve(response.result['Bid']);
+        });
+    });
 }
 
 module.exports = appRouter;
