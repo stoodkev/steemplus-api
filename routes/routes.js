@@ -341,6 +341,7 @@ var appRouter = function (app) {
     {
       totalSteem = totalSteem = Number(values["0"].total_vesting_fund_steem.split(' ')[0]);
       totalVests = Number(values["0"].total_vesting_shares.split(' ')[0]);
+      // Calculate ration SBD/Steem
       SBDperSteem = values[2] / values[1];
 
       // Get the last entry the requestType 0 (Comments)
@@ -502,40 +503,20 @@ async function updateSteemplusPointsComments(comments, totalSteem, totalVests)
   console.log(`Added ${nbPointDetailsAdded} pointDetail(s)`);
 }
 
+// Function used to get Steem Price
 function getPriceSteemAsync() {
     return new Promise(function(resolve, reject) {
-        $.ajax({
-            type: "GET",
-            beforeSend: function(xhttp) {
-                xhttp.setRequestHeader("Content-type", "application/json");
-                xhttp.setRequestHeader("X-Parse-Application-Id", chrome.runtime.id);
-            },
-            url: 'https://bittrex.com/api/v1.1/public/getticker?market=BTC-STEEM',
-            success: function(response) {
-                resolve(response.result['Bid']);
-            },
-            error: function(msg) {
-                resolve(msg);
-            }
+        getJSON('https://bittrex.com/api/v1.1/public/getticker?market=BTC-STEEM', function(err, response){
+          resolve(response.result['Bid']);
         });
     });
 }
 
+// Function used to get SBD price
 function getPriceSBDAsync() {
     return new Promise(function(resolve, reject) {
-        $.ajax({
-            type: "GET",
-            beforeSend: function(xhttp) {
-                xhttp.setRequestHeader("Content-type", "application/json");
-                xhttp.setRequestHeader("X-Parse-Application-Id", chrome.runtime.id);
-            },
-            url: 'https://bittrex.com/api/v1.1/public/getticker?market=BTC-SBD',
-            success: function(response) {
-                resolve(response.result['Bid']);
-            },
-            error: function(msg) {
-                resolve(msg);
-            }
+        getJSON('https://bittrex.com/api/v1.1/public/getticker?market=BTC-SBD', function(err, response){
+          resolve(response.result['Bid']);
         });
     });
 }
