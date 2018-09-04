@@ -6,3 +6,8 @@ exports.commentNewUser=function(post,lastUpdate,numUsers) {
   commentBody += `To see why **${numUsers} Steemians** use SteemPlus, [install our extension](https://chrome.google.com/webstore/detail/steemplus/mjbkjgcplmaneajhcbegoffkedeankaj?hl=en), read the [documentation](https://github.com/stoodkev/SteemPlus/blob/master/README.md) or the latest release : [${lastUpdate.title}](${lastUpdate.url}).\n`;
   return commentBody;
 }
+
+exports.formatDate = function(string)
+{
+	return `${string.getFullYear()}-${string.getMonth()+1}-${string.getDate()} ${string.getHours()}:${string.getMinutes()}:${string.getSeconds()}.${string.getMilliseconds()}`;
+}
