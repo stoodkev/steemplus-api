@@ -287,6 +287,25 @@ app.post("/api/get-reblogs-per-post", function(req, res){
   }
 });
 
+// Job used to power up steemplus-pay
+app.get("/job/power/:key", function(req, res){
+  if(req.params.key==config.key){
+    steem.api.getAccounts(['steemplus-pay'], function(err, response){
+      console.log(response[0].reward_steem_balance);
+      steem.broadcast.claimRewardBalance(config.payPostKey, 'steemplus-pay', response[0].reward_steem_balance, response[0].reward_sbd_balance, response[0].reward_vesting_balance, function(err, result) {
+        console.log((parseFloat(response[0].reward_steem_balance.split(" ")[0])+parseFloat(response[0].balance.split(" ")[0])).toFixed(3)+" STEEM");
+        console.log(err,result);
+        steem.broadcast.transferToVesting(config.payActKey, 'steemplus-pay', 'steemplus-pay', (parseFloat(response[0].reward_steem_balance.split(" ")[0])+parseFloat(response[0].balance.split(" ")[0])).toFixed(3)+" STEEM", function(err, result) {
+          console.log(err, result);
+        });
+      });
+    });
+  }
+  else {
+    res.status(403).send("Permission denied");
+  }
+});
+
 }
 
 module.exports = appRouter;
