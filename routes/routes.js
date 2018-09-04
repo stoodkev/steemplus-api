@@ -9,7 +9,6 @@ var TypeTransaction = require('../models/typeTransaction');
 var totalVests = null;
 var totalSteem = null;
 
-
 var lastPermlink=null;
 var appRouter = function (app) {
 
@@ -318,7 +317,20 @@ var appRouter = function (app) {
     }
   });
 
-// This function is used to update steemplus point. 
+
+  // Function used to get the details of an account. 
+  // @parameter username : account name
+  // Return the number of points of an account and other information as the detail of every entry of steemplus point
+  app.get("/api/get-steemplus-points/:username", function(req, res){
+    let paramUsername = req.params.username;
+    // The populate function helps giving the full information instead of the id of the "typeTransaction" or "pointsDetails"
+    User.find({accountName: paramUsername}).populate({path: 'pointsDetails', populate: {path: 'typeTransaction'}}).exec(function(err, user){
+      if(err) res.status(520).send('Error');
+      else res.status(200).send(user);
+    });
+  });
+
+  // This function is used to update steemplus point. 
   // Function executed every hour.
   // Only get the results since the last entry.
   app.get("/job/update-steemplus-points", function(req, res){
