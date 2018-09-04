@@ -333,73 +333,77 @@ var appRouter = function (app) {
   // This function is used to update steemplus point. 
   // Function executed every hour.
   // Only get the results since the last entry.
-  app.get("/job/update-steemplus-points", function(req, res){
-    // Get dynamic properties of steem to be able to calculate prices
-    Promise.all([steem.api.getDynamicGlobalPropertiesAsync()])
-    .then(async function(values)
-    {
-      totalSteem = totalSteem = Number(values["0"].total_vesting_fund_steem.split(' ')[0]);
-      totalVests = Number(values["0"].total_vesting_shares.split(' ')[0]);
+  app.get("/job/update-steemplus-points/:key", function(req, res){
+    if(req.params.key==config.key){
+      // Get dynamic properties of steem to be able to calculate prices
+      Promise.all([steem.api.getDynamicGlobalPropertiesAsync()])
+      .then(async function(values)
+      {
+        totalSteem = totalSteem = Number(values["0"].total_vesting_fund_steem.split(' ')[0]);
+        totalVests = Number(values["0"].total_vesting_shares.split(' ')[0]);
 
-      // Get the last entry the requestType 0 (Comments)
-      var lastEntry = await PointsDetail.find({requestType: 0}).sort({timestamp: -1}).limit(1);
-      // Get the creation date of the last entry
-      var lastEntryDate = null;
-      if(lastEntry[0] !== undefined)
-        lastEntryDate = lastEntry[0].timestampString;
-      else
+        // Get the last entry the requestType 0 (Comments)
+        var lastEntry = await PointsDetail.find({requestType: 0}).sort({timestamp: -1}).limit(1);
+        // Get the creation date of the last entry
+        var lastEntryDate = null;
+        if(lastEntry[0] !== undefined)
+          lastEntryDate = lastEntry[0].timestampString;
+        else
+          lastEntryDate = '2018-08-03 12:05:42.000'; // This date is the steemplus point annoncement day
+        // Wait for SteemSQL's query result before starting the second request
+        // We decided to wait to be sure this function won't try to update the same row twice at the same time
+        await new sql.ConnectionPool(config.config_api).connect().then(pool => {
+          return pool.request()
+          .query(`
+            SELECT
+              REPLACE(VOCommentBenefactorRewards.reward, ' VESTS', '') as reward, Comments.created, Comments.author, Comments.title, Comments.url, Comments.permlink, Comments.beneficiaries, Comments.total_payout_value
+            FROM
+              VOCommentBenefactorRewards
+              INNER JOIN Comments ON VOCommentBenefactorRewards.author = Comments.author AND VOCommentBenefactorRewards.permlink = Comments.permlink
+            WHERE 
+              benefactor = 'steemplus-pay'
+            AND created > CONVERT(datetime, '${lastEntryDate}')
+            ORDER BY created ASC;
+            `)})
+          .then(result => {
+            // get result
+            var comments = result.recordsets[0];
+            // Start data processing
+            updateSteemplusPointsComments(comments, totalSteem, totalVests);
+            sql.close();
+          }).catch(error => {console.log(error);
+        sql.close();});
+
+        // Get the last entry for the second request type (Transfers : MinnowBooster or Postpromoter)
+        lastEntry = await PointsDetail.find({requestType: 1}).sort({timestamp: -1}).limit(1);
+        var lastEntryDate = null;
+        if(lastEntry[0] !== undefined)
+          lastEntryDate = lastEntry[0].timestampString;
+        else
         lastEntryDate = '2018-08-03 12:05:42.000'; // This date is the steemplus point annoncement day
-      // Wait for SteemSQL's query result before starting the second request
-      // We decided to wait to be sure this function won't try to update the same row twice at the same time
-      await new sql.ConnectionPool(config.config_api).connect().then(pool => {
-        return pool.request()
-        .query(`
-          SELECT
-            REPLACE(VOCommentBenefactorRewards.reward, ' VESTS', '') as reward, Comments.created, Comments.author, Comments.title, Comments.url, Comments.permlink, Comments.beneficiaries, Comments.total_payout_value
-          FROM
-            VOCommentBenefactorRewards
-            INNER JOIN Comments ON VOCommentBenefactorRewards.author = Comments.author AND VOCommentBenefactorRewards.permlink = Comments.permlink
-          WHERE 
-            benefactor = 'steemplus-pay'
-          AND created > CONVERT(datetime, '${lastEntryDate}')
-          ORDER BY created ASC;
-          `)})
-        .then(result => {
-          // get result
-          var comments = result.recordsets[0];
-          // Start data processing
-          updateSteemplusPointsComments(comments, totalSteem, totalVests);
-          sql.close();
-        }).catch(error => {console.log(error);
-      sql.close();});
-
-      // Get the last entry for the second request type (Transfers : MinnowBooster or Postpromoter)
-      lastEntry = await PointsDetail.find({requestType: 1}).sort({timestamp: -1}).limit(1);
-      var lastEntryDate = null;
-      if(lastEntry[0] !== undefined)
-        lastEntryDate = lastEntry[0].timestampString;
-      else
-      lastEntryDate = '2018-08-03 12:05:42.000'; // This date is the steemplus point annoncement day
-      // Execute SteemSQL query
-      await new sql.ConnectionPool(config.config_api).connect().then(pool => {
-        return pool.request()
-        .query(`
-          SELECT timestamp, [from], [to], amount, amount_symbol, memo 
-          FROM TxTransfers 
-          WHERE timestamp > CONVERT(datetime, '${lastEntryDate}') 
-          AND memo LIKE 'steemplus%' 
-          AND ([to] = 'minnowbooster' OR [from] = 'postpromoter');
-          `)})
-        .then(result => {
-          var transfers = result.recordsets[0];
-          updateSteemplusPointsTransfers(transfers);
-          res.status(200).send("OK");
-          sql.close();
-        }).catch(error => {console.log(error);
-      sql.close();});
+        // Execute SteemSQL query
+        await new sql.ConnectionPool(config.config_api).connect().then(pool => {
+          return pool.request()
+          .query(`
+            SELECT timestamp, [from], [to], amount, amount_symbol, memo 
+            FROM TxTransfers 
+            WHERE timestamp > CONVERT(datetime, '${lastEntryDate}') 
+            AND memo LIKE 'steemplus%' 
+            AND ([to] = 'minnowbooster' OR [from] = 'postpromoter');
+            `)})
+          .then(result => {
+            var transfers = result.recordsets[0];
+            updateSteemplusPointsTransfers(transfers);
+            res.status(200).send("OK");
+            sql.close();
+          }).catch(error => {console.log(error);
+        sql.close();});
+      });
     });
-  });
-
+  }
+  else {
+    res.status(403).send("Permission denied");
+  }
 }
 
 // Function used to process the data from SteemSQL for requestType == 1
