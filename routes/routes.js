@@ -2,7 +2,12 @@ let config=require("../config");
 let sql=require("mssql");
 let steem=require("steem");
 let utils=require("../utils");
-var getJSON = require('get-json')
+var getJSON = require('get-json');
+var User = require('../models/user');
+var PointsDetail = require('../models/pointsDetail');
+var TypeTransaction = require('../models/typeTransaction');
+var totalVests = null;
+var totalSteem = null;
 
 
 var lastPermlink=null;
@@ -313,17 +318,170 @@ var appRouter = function (app) {
     }
   });
 
+// This function is used to update steemplus point. 
+  // Function executed every hour.
+  // Only get the results since the last entry.
   app.get("/job/update-steemplus-points", function(req, res){
-    new sql.ConnectionPool(config.config_api).connect().then(pool => {
-      return pool.request()
-      .query(querySQL)})
-      .then(result => {
-      res.status(200).send(result.recordsets[0]);
-      sql.close();
-    }).catch(error => {console.log(error);
-    sql.close();});
+    // Get dynamic properties of steem to be able to calculate prices
+    Promise.all([steem.api.getDynamicGlobalPropertiesAsync()])
+    .then(async function(values)
+    {
+      totalSteem = totalSteem = Number(values["0"].total_vesting_fund_steem.split(' ')[0]);
+      totalVests = Number(values["0"].total_vesting_shares.split(' ')[0]);
+
+      // Get the last entry the requestType 0 (Comments)
+      var lastEntry = await PointsDetail.find({requestType: 0}).sort({timestamp: -1}).limit(1);
+      // Get the creation date of the last entry
+      var lastEntryDate = null;
+      if(lastEntry[0] !== undefined)
+        lastEntryDate = lastEntry[0].timestampString;
+      else
+        lastEntryDate = '2018-08-03 12:05:42.000'; // This date is the steemplus point annoncement day
+      // Wait for SteemSQL's query result before starting the second request
+      // We decided to wait to be sure this function won't try to update the same row twice at the same time
+      await new sql.ConnectionPool(config.config_api).connect().then(pool => {
+        return pool.request()
+        .query(`
+          SELECT
+            REPLACE(VOCommentBenefactorRewards.reward, ' VESTS', '') as reward, Comments.created, Comments.author, Comments.title, Comments.url, Comments.permlink, Comments.beneficiaries, Comments.total_payout_value
+          FROM
+            VOCommentBenefactorRewards
+            INNER JOIN Comments ON VOCommentBenefactorRewards.author = Comments.author AND VOCommentBenefactorRewards.permlink = Comments.permlink
+          WHERE 
+            benefactor = 'steemplus-pay'
+          AND created > CONVERT(datetime, '${lastEntryDate}')
+          ORDER BY created ASC;
+          `)})
+        .then(result => {
+          // get result
+          var comments = result.recordsets[0];
+          // Start data processing
+          updateSteemplusPointsComments(comments, totalSteem, totalVests);
+          sql.close();
+        }).catch(error => {console.log(error);
+      sql.close();});
+
+      // Get the last entry for the second request type (Transfers : MinnowBooster or Postpromoter)
+      lastEntry = await PointsDetail.find({requestType: 1}).sort({timestamp: -1}).limit(1);
+      var lastEntryDate = null;
+      if(lastEntry[0] !== undefined)
+        lastEntryDate = lastEntry[0].timestampString;
+      else
+      lastEntryDate = '2018-08-03 12:05:42.000'; // This date is the steemplus point annoncement day
+      // Execute SteemSQL query
+      await new sql.ConnectionPool(config.config_api).connect().then(pool => {
+        return pool.request()
+        .query(`
+          SELECT timestamp, [from], [to], amount, amount_symbol, memo 
+          FROM TxTransfers 
+          WHERE timestamp > CONVERT(datetime, '${lastEntryDate}') 
+          AND memo LIKE 'steemplus%' 
+          AND ([to] = 'minnowbooster' OR [from] = 'postpromoter');
+          `)})
+        .then(result => {
+          var transfers = result.recordsets[0];
+          updateSteemplusPointsTransfers(transfers);
+          res.status(200).send("OK");
+          sql.close();
+        }).catch(error => {console.log(error);
+      sql.close();});
+    });
   });
 
+}
+
+// Function used to process the data from SteemSQL for requestType == 1
+// @parameter transfers : transfers data received from SteemSQL
+async function updateSteemplusPointsTransfers(transfers)
+{
+  // Number of new entry in the DB
+  var nbPointDetailsAdded = 0;
+  console.log(`Adding ${transfers.length} new transfer(s) to DB`);
+  // Iterate on transfers
+  for (const transfer of transfers) {
+    // Check if user is already in DB
+    var user = await User.findOne({accountName: transfer.from});
+    if(user === null)
+    {
+      // If not, create it
+      user = new User({accountName: transfer.from, nbPoints: 0});
+      user = await user.save();
+    }
+
+    // Get type
+    var type = 'default';
+    if(transfer.to === 'minnowbooster')
+      type = await TypeTransaction.findOne({name: 'MinnowBooster'});
+    else if(comment.beneficiaries.includes('utopian.pay'))
+      type = await TypeTransaction.findOne({name: 'PostPromoter'});
+
+    // Get the amount of the transfer
+    var amount = transfer.amount * 0.01; //Steemplus take 1% of the transaction
+    // We decided that 1SPP == 0.01 SBD
+    var nbPoints = amount * 100;
+    // Create new PointsDetail entry
+    var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: transfer.amount_symbol, permlink: '', user: user._id, typeTransaction: type._id, timestamp: transfer.timestamp, timestampString: utils.formatDate(transfer.timestamp), requestType: 1});
+    pointsDetail = await pointsDetail.save();
+    
+    // Update user account
+    user.pointsDetails.push(pointsDetail);
+    user.nbPoints = user.nbPoints + nbPoints;
+    await user.save(function (err) {});
+    nbPointDetailsAdded++;
+  }
+  console.log(`Added ${nbPointDetailsAdded} pointDetail(s)`);
+}
+
+// Function used to process the data from SteemSQL for requestType == 0
+// @parameter comments : posts data received from SteemSQL
+// @parameter totalSteem : dynamic value from the blockchain
+// @parameter totalVests : dynamic value from the blockchain
+async function updateSteemplusPointsComments(comments, totalSteem, totalVests)
+{
+  // Number of new entry in the DB
+  var nbPointDetailsAdded = 0;
+  console.log(`Adding ${comments.length} new comment(s) to DB`);
+  // Iterate on transfers
+  for (const comment of comments) {
+    
+    // Check if user is already in DB
+    var user = await User.findOne({accountName: comment.author});
+    if(user === null)
+    {
+      // If not create it
+      user = new User({accountName: comment.author, nbPoints: 0});
+      // Need to wait for the creation to be done to be able to use the object
+      user = await user.save();
+    }
+    
+    // Get type
+    var type = 'default';
+    if(comment.beneficiaries.includes('dtube.pay'))
+      type = await TypeTransaction.findOne({name: 'DTube'});
+    else if(comment.beneficiaries.includes('utopian.pay'))
+      type = await TypeTransaction.findOne({name: 'Utopian.io'});
+    else
+    {
+      var benefs = JSON.parse(comment.beneficiaries);
+      if(benefs.length > 1)
+        type = await TypeTransaction.findOne({name: 'Beneficiaries'}); 
+      else
+        type = await TypeTransaction.findOne({name: 'Donation'}); 
+    }
+
+    // Get the amount of the transaction
+    var amount = steem.formatter.vestToSteem(parseFloat(comment.reward), totalVests, totalSteem).toFixed(3);
+    // Get the number of Steemplus points
+    var nbPoints = amount*100.0;
+    var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: 'SP', permlink: comment.permlink, url:comment.url, title:comment.title, user: user._id, typeTransaction: type._id, timestamp: comment.created, timestampString: utils.formatDate(comment.created), requestType: 0});
+    pointsDetail = await pointsDetail.save();
+    // Update user acccount's points
+    user.pointsDetails.push(pointsDetail);
+    user.nbPoints = user.nbPoints + nbPoints;
+    await user.save(function (err) {});
+    nbPointDetailsAdded++;
+  }
+  console.log(`Added ${nbPointDetailsAdded} pointDetail(s)`);
 }
 
 module.exports = appRouter;
