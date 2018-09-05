@@ -484,7 +484,7 @@ async function votingRoutine(spAccount, posts)
   let totalPercentage = 0;
   for(let post of posts)
   {
-    let percentage = (Math.floor((post.nbPoints/totalSPP*1000)*100))/100.00;
+    let percentage = Math.floor(post.nbPoints/totalSPP*100000);
     post.percentage = percentage;
     totalPercentage += percentage;
   }
@@ -496,7 +496,6 @@ async function votingRoutine(spAccount, posts)
     updatePercentages(posts);
   }
   // Sort the list to make sure first votes are going to the one with maximum SPP
-  // 
   posts.sort(function(a, b){return b.nbPoints-a.nbPoints});
 
   var nbPostsToSend = -1;
@@ -517,18 +516,27 @@ async function votingRoutine(spAccount, posts)
       //     });
       //   }
       // });
-      console.log(`Trying to vote for ${post.permlink} written by ${post.author}`);
-      steem.broadcast.vote(config.wif_test, 'lecaillon', post.author, post.permlink, post.percentage * 100, function(err, result) {
-        if(err) console.log(err);
-        else console.log(`Succeed voting for ${post.permlink} written by ${post.author}`);
-      });
-      console.log(`Trying to comment for ${post.permlink} written by ${post.author}`);
-      steem.broadcast.comment(config.wif_test, post.author, post.permlink, 'lecaillon', post.permlink+"---vote-test", "Vote test", utils.commentVotingBotTest(post), {}, function(err, result) {
-        if(err) console.log(err);
-        else console.log(`Succeed commenting for ${post.permlink} written by ${post.author}`);
-      });
-    },30*1000*nbPostsToSend);
-    
+      if(post.pourcentage === 0)
+      {
+        console.log(`Percentage too low : Not voting for ${post.permlink} written by ${post.author}`);
+      }
+      else
+      {
+        console.log(`Trying to vote for ${post.permlink} written by ${post.author}, value : ${post.percentage}`);
+        steem.broadcast.vote(config.wif_test, 'lecaillon', post.author, post.permlink, post.percentage * 100, function(err, result) {
+          if(err) console.log(err);
+          else 
+          {
+            console.log(`Succeed voting for ${post.permlink} written by ${post.author}`);
+            console.log(`Trying to comment for ${post.permlink} written by ${post.author}`);
+            steem.broadcast.comment(config.wif_test, post.author, post.permlink, 'lecaillon', post.permlink+"---vote-test", "Vote test", utils.commentVotingBotTest(post), {}, function(err, result) {
+              if(err) console.log(err);
+              else console.log(`Succeed commenting for ${post.permlink} written by ${post.author}`);
+            });
+          }
+        });
+      }
+    },2*1000*nbPostsToSend);
   }
 }
 
@@ -542,11 +550,11 @@ function updatePercentages(posts)
   let totalSPPnew = 0.00;
   for(let post of posts)
   {
-    if(post.percentage >= 100.00)
+    if(post.percentage >= 10000)
     {
       // If percentage > 100 we put it back to 100.00 and add the difference with 100 to additionnalPercentage
-      additionnalPercentage += (post.percentage - 100.00);
-      post.percentage = 100.00;
+      additionnalPercentage += (post.percentage - 10000);
+      post.percentage = 10000;
     }
     else
       totalSPPnew += post.nbPoints; // If not, counts the 'new Points'
@@ -556,12 +564,12 @@ function updatePercentages(posts)
   let totalNewPercentage = 0.00;
   for(let post of posts)
   {
-    let percentage = 100.00;
-    if(post.percentage !== 100.00)
+    let percentage = 10000;
+    if(post.percentage !== 10000)
     {
       // For each post that has a percentage different than 100.00, add some more percentage.
-      let percentage = (Math.floor((post.nbPoints/totalSPPnew*additionnalPercentage)*100))/100.00;
-      post.percentage = (Math.floor((post.percentage+percentage)*100))/100.00;
+      let percentage = Math.floor(post.nbPoints/totalSPPnew*additionnalPercentage);
+      post.percentage = Math.floor(post.percentage+percentage);
     }
     totalNewPercentage += percentage;
   }
@@ -573,7 +581,7 @@ function hasUncorrectPercent(posts)
 {
   for(let post of posts)
   {
-    if(post.percentage > 100.00) return true;
+    if(post.percentage > 10000) return true;
   }
   return false;
 }
