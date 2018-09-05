@@ -499,12 +499,11 @@ async function votingRoutine(spAccount, posts)
   // 
   posts.sort(function(a, b){return b.nbPoints-a.nbPoints});
 
-  var nbPostsToSend = 0;
+  var nbPostsToSend = -1;
   // Start voting
   for(let post of posts)
   {
     nbPostsToSend++;
-    
     setTimeout(function()
     {
       // // TODO : change to steem-plus
@@ -513,24 +512,23 @@ async function votingRoutine(spAccount, posts)
       //   else
       //   {
       //     // TODO : change to steem-plus
-      //     steem.broadcast.comment(config.wif, post.author, post.permlink, 'lecaillon', result.permlink+"---steem-plus-vote", "SteemPlus Vote", utils.commentNewUser(post), {}, function(err, result) {
+      //     steem.broadcast.comment(config.wif, post.author, post.permlink, 'lecaillon', post.permlink+"---steem-plus-vote", "SteemPlus Vote", utils.commentNewUser(post), {}, function(err, result) {
       //       console.log(err, result);
       //     });
       //   }
       // });
-      steem.broadcast.vote(config.wif_config, 'lecaillon', post.author, post.permlink, post.percentage * 100, function(err, result) {
+      console.log(`Trying to vote for ${post.permlink} written by ${post.author}`);
+      steem.broadcast.vote(config.wif_test, 'lecaillon', post.author, post.permlink, post.percentage * 100, function(err, result) {
         if(err) console.log(err);
-        else
-        {
-          // TODO : change to steem-plus
-          steem.broadcast.comment(config.wif_config, post.author, post.permlink, 'lecaillon', result.permlink+"---vote-test", "Vote test", utils.commentVotingBotTest(post), {}, function(err, result) {
-            console.log(err, result);
-          });
-        }
+        else console.log(`Succeed voting for ${post.permlink} written by ${post.author}`);
       });
-    },21*1000*nbPostsToSend);
+      console.log(`Trying to comment for ${post.permlink} written by ${post.author}`);
+      steem.broadcast.comment(config.wif_test, post.author, post.permlink, 'lecaillon', post.permlink+"---vote-test", "Vote test", utils.commentVotingBotTest(post), {}, function(err, result) {
+        if(err) console.log(err);
+        else console.log(`Succeed commenting for ${post.permlink} written by ${post.author}`);
+      });
+    },30*1000*nbPostsToSend);
     
-  });
   }
 }
 
