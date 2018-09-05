@@ -412,6 +412,7 @@ var appRouter = function (app) {
 
   // Bot for Steemplus daily vote
   app.get("/job/bot-vote", function(req, res){
+    // IMPORTANT DONT FORGET THE KEY AFTER TESTING
     // get Steem-plus voting power
     steem.api.getAccounts(["steem-plus"], function(err, result) {
       if (err) console.log(err);
@@ -419,18 +420,22 @@ var appRouter = function (app) {
       {
         let spAccount = result[0];
         // Only start voting if the voting power is full
-        if(spAccount.voting_power !== 10000)
+        if(spAccount.voting_power !== 10000) // TO CHANGE
         {
+          // Find all the accounts names that has more than 0 points
           User.find({nbPoints: {$gt: 0}}, 'accountName', function(err, users){
             if(err) console.log(`Error while getting users : ${err}`);
             else
             {
+              // Get a list with those names
               let usernameList = [];
               users.map((user) => usernameList.push(`'${user.accountName}'`));
+              // Execute a SQL query that get the last article from all those users if their last article has been posted
+              // less than 24h ago
               new sql.ConnectionPool(config.config_api).connect().then(pool => {
               return pool.request()
               .query(`
-                SELECT permlink, title, Comments.author, url
+                SELECT permlink, title, Comments.author, url, created
                 FROM Comments
                 INNER JOIN
                 (
@@ -466,9 +471,79 @@ var appRouter = function (app) {
 // Function used to process the voting routine
 // @parameter spAccount : SteemPlus account
 // @parameter posts : posts that have to be voted for
-function votingRoutine(spAccount, posts)
+async function votingRoutine(spAccount, posts)
 {
+  let totalSPP = 0;
+  for(let post of posts)
+  {
+    let user = await User.findOne({accountName: post.author});
+    post.nbPoints = user.nbPoints;
+    totalSPP += user.nbPoints;
+  }
+  console.log(`total points : ${totalSPP}`);
+
+  let totalPercentage = 0;
+  for(let post of posts)
+  {
+    let percentage = (Math.floor((post.nbPoints/totalSPP*1000)*100))/100.00;
+    post.percentage = percentage;
+    totalPercentage += percentage;
+  }
+  posts.sort(function(a, b){return b.nbPoints-a.nbPoints});
+
+  while(hasUncorrectPercent(posts))
+  {
+    updatePercentages(posts);
+  }
   console.log(posts);
+  console.log(`total points : ${totalSPP}`);
+  console.log(`total points : ${totalPercentage}`);
+}
+
+// Function used to recalculate the percentages if there is at least one > 100
+// @parameter posts : list of the post that will be upvoted
+function updatePercentages(posts)
+{
+  // total of excess percentage
+  let additionnalPercentage = 0.00; 
+  // total SPP for the posts that will be given additional percentage 
+  let totalSPPnew = 0.00;
+  for(let post of posts)
+  {
+    if(post.percentage >= 100.00)
+    {
+      // If percentage > 100 we put it back to 100.00 and add the difference with 100 to additionnalPercentage
+      additionnalPercentage += (post.percentage - 100.00);
+      post.percentage = 100.00;
+    }
+    else
+      totalSPPnew += post.nbPoints; // If not, counts the 'new Points'
+  }
+
+
+  let totalNewPercentage = 0.00;
+  for(let post of posts)
+  {
+    let percentage = 100.00;
+    if(post.percentage !== 100.00)
+    {
+      // For each post that has a percentage different than 100.00, add some more percentage.
+      let percentage = (Math.floor((post.nbPoints/totalSPPnew*additionnalPercentage)*100))/100.00;
+      post.percentage = (Math.floor((post.percentage+percentage)*100))/100.00;
+    }
+    totalNewPercentage += percentage;
+  }
+}
+
+// Function used to check if there is still percentage > 100 in the list
+// @parameter posts : list of the post that will be upvoted
+function hasUncorrectPercent(posts)
+{
+  for(let post of posts)
+  {
+    if(post.percentage > 100.00) return true;
+  }
+  return false;
 }
 
 // Function used to process the data from SteemSQL for requestType == 1
