@@ -480,7 +480,6 @@ async function votingRoutine(spAccount, posts)
     post.nbPoints = user.nbPoints;
     totalSPP += user.nbPoints;
   }
-  console.log(`total points : ${totalSPP}`);
 
   let totalPercentage = 0;
   for(let post of posts)
@@ -491,13 +490,48 @@ async function votingRoutine(spAccount, posts)
   }
   posts.sort(function(a, b){return b.nbPoints-a.nbPoints});
 
+  // Updated percentages until every post has percentage under 100
   while(hasUncorrectPercent(posts))
   {
     updatePercentages(posts);
   }
-  console.log(posts);
-  console.log(`total points : ${totalSPP}`);
-  console.log(`total points : ${totalPercentage}`);
+  // Sort the list to make sure first votes are going to the one with maximum SPP
+  // 
+  posts.sort(function(a, b){return b.nbPoints-a.nbPoints});
+
+  var nbPostsToSend = 0;
+  // Start voting
+  for(let post of posts)
+  {
+    nbPostsToSend++;
+    
+    setTimeout(function()
+    {
+      // // TODO : change to steem-plus
+      // steem.broadcast.vote(config.wif, 'lecaillon', post.author, post.permlink, post.percentage * 100, function(err, result) {
+      //   if(err) console.log(err);
+      //   else
+      //   {
+      //     // TODO : change to steem-plus
+      //     steem.broadcast.comment(config.wif, post.author, post.permlink, 'lecaillon', result.permlink+"---steem-plus-vote", "SteemPlus Vote", utils.commentNewUser(post), {}, function(err, result) {
+      //       console.log(err, result);
+      //     });
+      //   }
+      // });
+      steem.broadcast.vote(config.wif_config, 'lecaillon', post.author, post.permlink, post.percentage * 100, function(err, result) {
+        if(err) console.log(err);
+        else
+        {
+          // TODO : change to steem-plus
+          steem.broadcast.comment(config.wif_config, post.author, post.permlink, 'lecaillon', result.permlink+"---vote-test", "Vote test", utils.commentVotingBotTest(post), {}, function(err, result) {
+            console.log(err, result);
+          });
+        }
+      });
+    },21*1000*nbPostsToSend);
+    
+  });
+  }
 }
 
 // Function used to recalculate the percentages if there is at least one > 100
