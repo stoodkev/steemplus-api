@@ -9,6 +9,7 @@ var TypeTransaction = require('../models/typeTransaction');
 var totalVests = null;
 var totalSteem = null;
 var ratioSBDSteem = null;
+var votingAccount = 'lecaillon';
 
 var lastPermlink=null;
 var appRouter = function (app) {
@@ -411,8 +412,12 @@ var appRouter = function (app) {
   });
 
   // Bot for Steemplus daily vote
-  app.get("/job/bot-vote", function(req, res){
-    // IMPORTANT DONT FORGET THE KEY AFTER TESTING
+  app.get("/job/bot-vote/:key", function(req, res){
+    if(req.params.key !== config.key)
+    {
+      res.status(403).send("Permission denied");
+      return;
+    }
     // get Steem-plus voting power
     steem.api.getAccounts(["steem-plus"], function(err, result) {
       if (err) console.log(err);
@@ -420,7 +425,7 @@ var appRouter = function (app) {
       {
         let spAccount = result[0];
         // Only start voting if the voting power is full
-        if(spAccount.voting_power !== 10000) // TO CHANGE
+        if(spAccount.voting_power === 10000)
         {
           // Find all the accounts names that has more than 0 points
           User.find({nbPoints: {$gt: 0}}, 'accountName', function(err, users){
@@ -460,7 +465,7 @@ var appRouter = function (app) {
           });
         }
         else
-          console.log(`Voting power is only ${spAccount.voting_power/100.00}%... Need to way more`);
+          console.log(`Voting power is only ${spAccount.voting_power/100.00}%... Need to wait more`);
 
       }
     });
@@ -498,45 +503,76 @@ async function votingRoutine(spAccount, posts)
   // Sort the list to make sure first votes are going to the one with maximum SPP
   posts.sort(function(a, b){return b.nbPoints-a.nbPoints});
 
-  var nbPostsToSend = -1;
+  var nbPostsSent = -1;
   // Start voting
+  console.log(`Will try to vote for ${posts.length} post(s)`);
   for(let post of posts)
   {
-    nbPostsToSend++;
-    setTimeout(function()
+    nbPostsSent++;
+    (function(indexPost)
     {
-      // // TODO : change to steem-plus
-      // steem.broadcast.vote(config.wif, 'lecaillon', post.author, post.permlink, post.percentage * 100, function(err, result) {
-      //   if(err) console.log(err);
-      //   else
-      //   {
-      //     // TODO : change to steem-plus
-      //     steem.broadcast.comment(config.wif, post.author, post.permlink, 'lecaillon', post.permlink+"---steem-plus-vote", "SteemPlus Vote", utils.commentNewUser(post), {}, function(err, result) {
-      //       console.log(err, result);
-      //     });
-      //   }
-      // });
-      if(post.pourcentage === 0)
+      setTimeout(function()
       {
-        console.log(`Percentage too low : Not voting for ${post.permlink} written by ${post.author}`);
-      }
-      else
-      {
-        console.log(`Trying to vote for ${post.permlink} written by ${post.author}, value : ${post.percentage}`);
-        steem.broadcast.vote(config.wif_test, 'lecaillon', post.author, post.permlink, post.percentage * 100, function(err, result) {
-          if(err) console.log(err);
-          else 
-          {
-            console.log(`Succeed voting for ${post.permlink} written by ${post.author}`);
-            console.log(`Trying to comment for ${post.permlink} written by ${post.author}`);
-            steem.broadcast.comment(config.wif_test, post.author, post.permlink, 'lecaillon', post.permlink+"---vote-test", "Vote test", utils.commentVotingBotTest(post), {}, function(err, result) {
-              if(err) console.log(err);
-              else console.log(`Succeed commenting for ${post.permlink} written by ${post.author}`);
-            });
-          }
-        });
-      }
-    },2*1000*nbPostsToSend);
+        console.log(`Post #${indexPost}/${posts.length}`);
+        if(post.percentage === 0)
+        {
+          console.log(`Vote too low : Not voting for ${post.permlink} written by ${post.author}`);
+        }
+        else
+        {
+          console.log(`Trying to vote for ${post.permlink} written by ${post.author}, value : ${post.percentage}`);
+          steem.broadcast.vote(config.wif, votingAccount, post.author, post.permlink, post.percentage, function(err, result) {
+            if(err)
+            {
+              let errorString = err.toString();
+              if(/Voting weight is too small/.test(errorString))
+                console.log(`Vote too low : Not voting for ${post.permlink} written by ${post.author}`);
+              else console.log(err);
+            }
+            else 
+            {
+              console.log(`Succeed voting for ${post.permlink} written by ${post.author}, value : ${post.percentage}`);
+              console.log(`Trying to comment for ${post.permlink} written by ${post.author}`);
+              steem.broadcast.comment(config.wif, post.author, post.permlink, votingAccount, post.permlink+"---vote-test", "Upvote", utils.commentVotingBotTest(post), {}, function(err, result) {
+                if(err) console.log(err);
+                else console.log(`Succeed commenting for ${post.permlink} written by ${post.author}`);
+              });
+            }
+          });
+        }
+      },30*1000*nbPostsSent); // Can't comment more than once every 20 second so we decided to use 30sec in case blockchain is slow
+    })(nbPostsSent+1);
+    //   setTimeout(function()
+    //   {
+    //     console.log(`Post #${indexPost}/${posts.length}`);
+    //     if(post.percentage === 0)
+    //     {
+    //       console.log(`Vote too low : Not voting for ${post.permlink} written by ${post.author}`);
+    //     }
+    //     else
+    //     {
+    //       console.log(`Trying to vote for ${post.permlink} written by ${post.author}, value : ${post.percentage}`);
+    //       steem.broadcast.vote(config.wif, votingAccount, post.author, post.permlink, post.percentage, function(err, result) {
+    //         if(err)
+    //         {
+    //           let errorString = err.toString();
+    //           if(/Voting weight is too small/.test(errorString))
+    //             console.log(`Vote too low : Not voting for ${post.permlink} written by ${post.author}`);
+    //           else console.log(err);
+    //         }
+    //         else 
+    //         {
+    //           console.log(`Succeed voting for ${post.permlink} written by ${post.author}, value : ${post.percentage}`);
+    //           console.log(`Trying to comment for ${post.permlink} written by ${post.author}`);
+    //           steem.broadcast.comment(config.wif, post.author, post.permlink, votingAccount, post.permlink+"---vote-steemplus", "SteemPlus upvote", utils.commentVotingBot(post), {}, function(err, result) {
+    //             if(err) console.log(err);
+    //             else console.log(`Succeed commenting for ${post.permlink} written by ${post.author}`);
+    //           });
+    //         }
+    //       });
+    //     }
+    //   },30*1000*nbPostsSent); // Can't comment more than once every 20 second so we decided to use 30sec in case blockchain is slow
+    // })(nbPostsSent+1);
   }
 }
 
