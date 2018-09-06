@@ -398,7 +398,7 @@ var appRouter = function (app) {
           FROM TxTransfers 
           WHERE timestamp > CONVERT(datetime, '${lastEntryDate}') 
           AND memo LIKE 'steemplus%' 
-          AND ([to] = 'minnowbooster' OR [from] = 'postpromoter');
+          AND ([to] = 'minnowbooster' OR [to] = 'postpromoter');
           `)})
         .then(result => {
           var transfers = result.recordsets[0];
