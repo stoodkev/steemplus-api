@@ -361,6 +361,18 @@ var appRouter = function (app) {
         lastEntryDate = '2018-08-10 12:05:42.000'; // This date is the steemplus point annoncement day + 7 days for rewards because rewards come after 7 days.
       // Wait for SteemSQL's query result before starting the second request
       // We decided to wait to be sure this function won't try to update the same row twice at the same time
+
+      console.log(`
+          SELECT
+            REPLACE(VOCommentBenefactorRewards.reward, ' VESTS', '') as reward, VOCommentBenefactorRewards.timestamp as created , Comments.author, Comments.title, Comments.url, Comments.permlink, Comments.beneficiaries, Comments.total_payout_value
+          FROM
+            VOCommentBenefactorRewards
+            INNER JOIN Comments ON VOCommentBenefactorRewards.author = Comments.author AND VOCommentBenefactorRewards.permlink = Comments.permlink
+          WHERE 
+            benefactor = 'steemplus-pay'
+          AND timestamp > CONVERT(datetime, '${lastEntryDate}')
+          ORDER BY created ASC;
+          `);
       await new sql.ConnectionPool(config.config_api).connect().then(pool => {
         return pool.request()
         .query(`
@@ -371,7 +383,7 @@ var appRouter = function (app) {
             INNER JOIN Comments ON VOCommentBenefactorRewards.author = Comments.author AND VOCommentBenefactorRewards.permlink = Comments.permlink
           WHERE 
             benefactor = 'steemplus-pay'
-          AND created > CONVERT(datetime, '${lastEntryDate}')
+          AND timestamp > CONVERT(datetime, '${lastEntryDate}')
           ORDER BY created ASC;
           `)})
         .then(result => {
