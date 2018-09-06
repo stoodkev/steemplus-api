@@ -419,7 +419,7 @@ var appRouter = function (app) {
       return;
     }
     // get Steem-plus voting power
-    steem.api.getAccounts(["steem-plus"], function(err, result) {
+    steem.api.getAccounts([votingAccount], function(err, result) {
       if (err) console.log(err);
       else 
       {
