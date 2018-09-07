@@ -425,8 +425,25 @@ async function updateSteemplusPointsTransfers(transfers)
   console.log(`Adding ${transfers.length} new transfer(s) to DB`);
   // Iterate on transfers
   for (const transfer of transfers) {
+    // Init default values
+
+    var accountName = transfer.from; // Default account name
+    // Get the amount of the transfer
+    var amount = transfer.amount * 0.01; //Steemplus take 1% of the transaction
+
+    // Get type
+    var type = 'default';
+    if(transfer.to === 'minnowbooster')
+      type = await TypeTransaction.findOne({name: 'MinnowBooster'});
+    else if(transfer.from === 'postpromoter' && transfer.to === 'steemplus-pay')
+    {
+      type = await TypeTransaction.findOne({name: 'PostPromoter'});
+      accountName = transfer.memo.match(/Sender: @([a-zA-Z0-9\.-]*),/i)[1];
+      amount = transfer.amount; // 1% already counted
+    }
+
     // Check if user is already in DB
-    var user = await User.findOne({accountName: transfer.from});
+    var user = await User.findOne({accountName: accountName});
     if(user === null)
     {
       // If not, create it
@@ -434,15 +451,7 @@ async function updateSteemplusPointsTransfers(transfers)
       user = await user.save();
     }
 
-    // Get type
-    var type = 'default';
-    if(transfer.to === 'minnowbooster')
-      type = await TypeTransaction.findOne({name: 'MinnowBooster'});
-    else if(transfer.from === 'postpromoter' && transfer.to === 'steemplus-pay')
-      type = await TypeTransaction.findOne({name: 'PostPromoter'});
-
-    // Get the amount of the transfer
-    var amount = transfer.amount * 0.01; //Steemplus take 1% of the transaction
+    
     // We decided that 1SPP == 0.01 SBD
     var nbPoints = 0;
     if(transfer.amount_symbol === "SBD")
