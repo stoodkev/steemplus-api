@@ -9,5 +9,5 @@ exports.commentNewUser=function(post,lastUpdate,numUsers) {
 
 exports.formatDate = function(string)
 {
-	return `${string.getFullYear()}-${string.getMonth()+1}-${string.getDate()} ${string.getHours()}:${string.getMinutes()}:${string.getSeconds()}.${string.getMilliseconds()}`;
+	return `${string.getUTCFullYear()}-${string.getUTCMonth()+1}-${string.getUTCDate()} ${string.getUTCHours()}:${string.getUTCMinutes()}:${string.getUTCSeconds()}.${string.getUTCMilliseconds()}`;
 }
