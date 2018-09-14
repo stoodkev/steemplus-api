@@ -343,13 +343,15 @@ var appRouter = function (app) {
       return;
     }
     // Get dynamic properties of steem to be able to calculate prices
-    Promise.all([steem.api.getDynamicGlobalPropertiesAsync(), getPriceSBDAsync(), getPriceSteemAsync()])
+    Promise.all([steem.api.getDynamicGlobalPropertiesAsync(), getPriceSBDAsync(), getPriceSteemAsync(), getLastBlockID()])
     .then(async function(values)
     {
       totalSteem = totalSteem = Number(values["0"].total_vesting_fund_steem.split(' ')[0]);
       totalVests = Number(values["0"].total_vesting_shares.split(' ')[0]);
       // Calculate ration SBD/Steem
       ratioSBDSteem = values[2] / values[1];
+
+      let delaySteemSQL = (parseInt(values[0].last_irreversible_block_num) - parseInt(values[3])) * 3;
 
       // Get the last entry the requestType 0 (Comments)
       var lastEntry = await PointsDetail.find({requestType: 0}).sort({timestamp: -1}).limit(1);
@@ -383,25 +385,38 @@ var appRouter = function (app) {
         }).catch(error => {console.log(error);
       sql.close();});
 
-      // Get the last entry for the second request type (Transfers : MinnowBooster or Postpromoter)
+      // Get the last entry for the second request type (Transfers : Postpromoter)
       lastEntry = await PointsDetail.find({requestType: 1}).sort({timestamp: -1}).limit(1);
       var lastEntryDate = null;
       if(lastEntry[0] !== undefined)
         lastEntryDate = lastEntry[0].timestampString;
       else
       lastEntryDate = '2018-08-03 12:05:42.000'; // This date is the steemplus point annoncement day
+
+      // Get the last entry for the second request type (Transfers : MinnowBooster)
+      lastEntryMB = await PointsDetail.find({requestType: 2}).sort({timestamp: -1}).limit(1);
+      var lastEntryDateMB = null;
+      if(lastEntryMB[0] !== undefined)
+        lastEntryDateMB = lastEntryMB[0].timestampString;
+      else
+      lastEntryDateMB = '2018-08-03 12:05:42.000'; // This date is the steemplus point annoncement day
       // Execute SteemSQL query
       await new sql.ConnectionPool(config.config_api).connect().then(pool => {
         return pool.request()
         .query(`
           SELECT timestamp, [from], [to], amount, amount_symbol, memo 
           FROM TxTransfers 
-          WHERE timestamp > CONVERT(datetime, '${lastEntryDate}') 
-          AND 
+          WHERE
           (
-              (memo LIKE 'steemplus%' AND [to] = 'minnowbooster')
+              ([from] = 'minnowbooster' and memo LIKE '%memo:%' and timestamp > CONVERT(datetime, '${lastEntryDateMB}'))
             OR 
-              ([to] = 'steemplus-pay' AND [from] != 'steemplus-pay')
+              ([from] = 'minnowbooster' and memo LIKE '%permlink:%' and timestamp > CONVERT(datetime, '${lastEntryDateMB}'))
+            OR
+              ([from] = 'minnowbooster' and memo LIKE '%Post:%' and timestamp > CONVERT(datetime, '${lastEntryDateMB}'))
+            OR
+              ([to] = 'minnowbooster' and memo LIKE 'steemplus%' AND timestamp < DATEADD(second, -${delaySteemSQL+10*60}, GETUTCDATE()) AND timestamp > CONVERT(datetime, '${lastEntryDateMB}'))
+            OR
+              ([to] = 'steemplus-pay' AND [from] != 'steemplus-pay' AND [from] != 'minnowbooster' AND timestamp > CONVERT(datetime, '${lastEntryDate}'))
           );
           `)})
         .then(result => {
@@ -422,34 +437,99 @@ async function updateSteemplusPointsTransfers(transfers)
 {
   // Number of new entry in the DB
   var nbPointDetailsAdded = 0;
-  console.log(`Adding ${transfers.length} new transfer(s) to DB`);
+  var nbMinnowAccepted = 0;
+  var nbMinnowRejected = 0;
+  var nbPostProAccepted = 0;
+  var nbPostProRejected = 0;
+  let reimbursementList = transfers.filter(transfer => transfer.from === 'minnowbooster');
+  let transfersList = transfers.filter(transfer => transfer.from !== 'minnowbooster');
+
+  console.log(`Adding ${transfersList.length} new transfer(s) to DB`);
   // Iterate on transfers
-  for (const transfer of transfers) {
+  for (const transfer of transfersList) {
+    var reason = null;
     // Init default values
 
-    var accountName = transfer.from; // Default account name
+    var permlink = '';
+    var accountName = null;
     // Get the amount of the transfer
     var amount = transfer.amount * 0.01; //Steemplus take 1% of the transaction
 
+    var requestType = null;
+    
     // Get type
-    var type = 'default';
-    if(transfer.to === 'minnowbooster')
+    var type = null;
+    if(transfer.to === 'minnowbooster'){
+      if(transfer.memo.toLowerCase().replace('steemplus') === '') 
+      {
+        continue;
+      }
       type = await TypeTransaction.findOne({name: 'MinnowBooster'});
+      for(const reimbursement of reimbursementList)
+      {
+        if(transfer.from === reimbursement.to)
+        {
+          if(transfer.memo.replace('steemplus https://steemit.com/', '').split('/')[2] === undefined)
+          {
+            if(reimbursement.memo.includes(transfer.memo.replace('steemplus ', '')))
+            {
+              if(reimbursement.memo.includes('You got an upgoat')){
+                amount = (transfer.amount - reimbursement.amount).toFixed(2) * 0.01;
+                permlink = transfer.memo.replace('steemplus ', '');
+                accountName = transfer.from;
+              }
+              else {
+                reason = reimbursement.memo;
+                break;
+              }
+            }
+          }
+          else if(reimbursement.memo.includes(transfer.memo.replace('steemplus https://steemit.com/', '').split('/')[2]))
+          {
+            if(reimbursement.memo.includes('You got an upgoat')){
+              permlink = transfer.memo.replace('steemplus https://steemit.com/', '').split('/')[2];
+              amount = (transfer.amount - reimbursement.amount).toFixed(2) * 0.01;
+              accountName = transfer.from;
+            }
+            else {
+              reason = reimbursement.memo;
+              break;
+            }
+          }
+        }
+      }
+      requestType = 2;
+    }
     else if(transfer.from === 'postpromoter' && transfer.to === 'steemplus-pay')
     {
       type = await TypeTransaction.findOne({name: 'PostPromoter'});
+      if(transfer.memo.match(/Sender: @([a-zA-Z0-9\.-]*),/i) === null)
+      {
+        continue;
+      } 
       accountName = transfer.memo.match(/Sender: @([a-zA-Z0-9\.-]*),/i)[1];
       amount = transfer.amount; // 1% already counted
+      requestType = 1;
     }
-
+    
+    if(type === null)
+    {
+      continue;
+    } 
+    if(reason !== null)
+    {
+      continue;
+    } 
     // Check if user is already in DB
+
     var user = await User.findOne({accountName: accountName});
     if(user === null)
     {
       // If not, create it
-      user = new User({accountName: transfer.from, nbPoints: 0});
+      user = new User({accountName: accountName, nbPoints: 0});
       user = await user.save();
     }
+
 
     
     // We decided that 1SPP == 0.01 SBD
@@ -459,7 +539,7 @@ async function updateSteemplusPointsTransfers(transfers)
     else if(transfer.amount_symbol === "STEEM")
       nbPoints = amount * ratioSBDSteem * 100;
     // Create new PointsDetail entry
-    var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: transfer.amount_symbol, permlink: '', user: user._id, typeTransaction: type._id, timestamp: transfer.timestamp, timestampString: utils.formatDate(transfer.timestamp), requestType: 1});
+    var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: transfer.amount_symbol, permlink: permlink, user: user._id, typeTransaction: type._id, timestamp: transfer.timestamp, timestampString: utils.formatDate(transfer.timestamp), requestType: requestType});
     pointsDetail = await pointsDetail.save();
     
     // Update user account
@@ -539,6 +619,19 @@ function getPriceSBDAsync() {
           resolve(response.result['Bid']);
         });
     });
+}
+
+function getLastBlockID() {
+  return new Promise(function(resolve, reject) {
+      new sql.ConnectionPool(config.config_api).connect().then(pool => {
+      return pool.request()
+      .query("select top 1 block_num from Blocks ORDER BY timestamp DESC")})
+      .then(result => {
+        resolve(result.recordsets[0][0].block_num);
+        sql.close();
+      }).catch(error => {console.log(error);
+    sql.close();});
+  });
 }
 
 module.exports = appRouter;
