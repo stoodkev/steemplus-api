@@ -350,6 +350,7 @@ var appRouter = function (app) {
       totalVests = Number(values["0"].total_vesting_shares.split(' ')[0]);
       // Calculate ration SBD/Steem
       ratioSBDSteem = values[2] / values[1];
+      storeSteemPriceInBlockchain(values[2], values[1]);
 
       let delaySteemSQL = (parseInt(values[0].last_irreversible_block_num) - parseInt(values[3])) * 3;
 
@@ -621,6 +622,7 @@ function getPriceSBDAsync() {
     });
 }
 
+// Function used to get the last block stored in SteemSQL. We use the result of this request to know if SteemSQL is synchronized with the blockchain
 function getLastBlockID() {
   return new Promise(function(resolve, reject) {
       new sql.ConnectionPool(config.config_api).connect().then(pool => {
@@ -631,6 +633,21 @@ function getLastBlockID() {
         sql.close();
       }).catch(error => {console.log(error);
     sql.close();});
+  });
+}
+
+// This function is used to store the price of steem and SBD in the blockchain,
+// This will help us to be able anytime to recreate the exact same database.
+function storeSteemPriceInBlockchain(priceSteem, priceSBD)
+{
+  const accountName = "cedricguillas";
+  const json = JSON.stringify([{
+    priceSteem: priceSteem,
+    priceSBD: priceSBD
+  }]);
+
+  steem.broadcast.transfer(config.wif || process.env.WIF_TEST_2, accountName, accountName, "0.001 SBD", json, function(err, result) {
+    console.log(err, result);
   });
 }
 
