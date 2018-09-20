@@ -552,7 +552,6 @@ async function updateSteemplusPointsTransfers(transfers)
     }
 
     var ratioSBDSteem = findSteemplusPrice(transfer.timestamp);
-    console.log(transfer.timestamp ,ratioSBDSteem);
     // We decided that 1SPP == 0.01 SBD
     var nbPoints = 0;
     if(transfer.amount_symbol === "SBD")
@@ -612,7 +611,6 @@ async function updateSteemplusPointsComments(comments, totalSteem, totalVests)
         type = await TypeTransaction.findOne({name: 'Donation'}); 
     }
     var ratioSBDSteem = findSteemplusPrice(comment.created);
-    console.log(comment.created, ratioSBDSteem);
     // Get the amount of the transaction
     var amount = steem.formatter.vestToSteem(parseFloat(comment.reward), totalVests, totalSteem).toFixed(3);
     // Get the number of Steemplus points
