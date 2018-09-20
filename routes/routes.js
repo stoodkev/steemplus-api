@@ -359,9 +359,10 @@ var appRouter = function (app) {
         .query(`
           SELECT timestamp, memo
           FROM TxTransfers
-          WHERE [from] = 'cedricguillas'
-          AND [to] = 'cedricguillas'
-          AND memo LIKE '%priceHistory%'
+          WHERE timestamp > '2018-08-03 12:05:42.000'
+          and [from] = 'cedricguillas'
+          and [to] = 'cedricguillas'
+          and memo LIKE '%priceHistory%'
           ORDER BY timestamp DESC;
           `)})
         .then(result => {
@@ -669,31 +670,31 @@ function storeSteemPriceInBlockchain(priceSteem, priceSBD)
     priceSBD: priceSBD
   }});
 
-  // steem.broadcast.transfer(config.wif || process.env.WIF_TEST_2, accountName, accountName, "0.001 SBD", json, function(err, result) {
-  //   console.log(err, result);
-  // });
+  steem.broadcast.transfer(config.wif || process.env.WIF_TEST_2, accountName, accountName, "0.001 SBD", json, function(err, result) {
+    console.log(err, result);
+  });
 }
 
 function findSteemplusPrice(date){
-  let minuteDate = date.getUTCMinutes() - date.getUTCMinutes()%10;
-  let periodDate = `${date.getUTCFullYear()}-${date.getUTCMonth()+1}-${date.getUTCDate()} ${date.getUTCHours()}:${minuteDate}:00.000`;
-  for(entry of priceHistory){
-    let minuteDateEntry = entry.timestamp.getUTCMinutes() - entry.timestamp.getUTCMinutes()%10;
-    let periodDateEntry = `${entry.timestamp.getUTCFullYear()}-${entry.timestamp.getUTCMonth()+1}-${entry.timestamp.getUTCDate()} ${entry.timestamp.getUTCHours()}:${minuteDateEntry}:00.000`;
-  
-    if(periodDate === periodDateEntry){
-      let entryJSON = JSON.parse(entry.memo);
-      let price = entryJSON.priceSteem / entryJSON.priceSBD;
-      return price;
-    }
-  }
+
   let dateNow = new Date();
   let minuteNow = dateNow.getUTCMinutes() - dateNow.getUTCMinutes()%10;
   let periodNow = `${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth()+1}-${dateNow.getUTCDate()} ${dateNow.getUTCHours()}:${minuteNow}:00.000`;
+  let minuteDate = date.getUTCMinutes() - date.getUTCMinutes()%10;
+  let periodDate = `${date.getUTCFullYear()}-${date.getUTCMonth()+1}-${date.getUTCDate()} ${date.getUTCHours()}:${minuteDate}:00.000`;
+  if(periodNow === periodDate) return currentRatioSBDSteem;
+  else
+  {
+    let prices = priceHistory.filter(p => p.timestamp < date);
   
-  if(periodNow === periodDate) return 
-  else return 1;
-  return currentRatioSBDSteem;
+    if(prices.length === 0) return 1;
+    else {
+      let priceJSON = JSON.parse(prices[0].memo).priceHistory;
+      if(priceJSON === undefined) return 1;
+      else
+        return priceJSON.priceSteem / priceJSON.priceSBD;
+    }
+  }
 }
 
 module.exports = appRouter;
