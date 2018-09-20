@@ -8,7 +8,8 @@ var PointsDetail = require('../models/pointsDetail');
 var TypeTransaction = require('../models/typeTransaction');
 var totalVests = null;
 var totalSteem = null;
-var ratioSBDSteem = null;
+var currentRatioSBDSteem = null;
+var steemPricesHistory = null;
 
 var lastPermlink=null;
 var appRouter = function (app) {
@@ -349,8 +350,26 @@ var appRouter = function (app) {
       totalSteem = totalSteem = Number(values["0"].total_vesting_fund_steem.split(' ')[0]);
       totalVests = Number(values["0"].total_vesting_shares.split(' ')[0]);
       // Calculate ration SBD/Steem
-      ratioSBDSteem = values[2] / values[1];
+      currentRatioSBDSteem = values[2] / values[1];
       storeSteemPriceInBlockchain(values[2], values[1]);
+
+      // get price history
+      await new sql.ConnectionPool(config.config_api).connect().then(pool => {
+        return pool.request()
+        .query(`
+          SELECT timestamp, memo
+          FROM TxTransfers
+          WHERE [from] = 'cedricguillas'
+          AND [to] = 'cedricguillas'
+          AND memo LIKE '%priceHistory%'
+          ORDER BY timestamp DESC;
+          `)})
+        .then(result => {
+          // get result
+          priceHistory = result.recordsets[0];
+          sql.close();
+        }).catch(error => {console.log(error);
+      sql.close();});
 
       let delaySteemSQL = (parseInt(values[0].last_irreversible_block_num) - parseInt(values[3])) * 3;
 
@@ -531,14 +550,17 @@ async function updateSteemplusPointsTransfers(transfers)
       user = await user.save();
     }
 
-
-    
+    var ratioSBDSteem = findSteemplusPrice(transfer.timestamp);
+    console.log(transfer.timestamp ,ratioSBDSteem);
     // We decided that 1SPP == 0.01 SBD
     var nbPoints = 0;
     if(transfer.amount_symbol === "SBD")
       nbPoints = amount * 100;
     else if(transfer.amount_symbol === "STEEM")
+    {
+      
       nbPoints = amount * ratioSBDSteem * 100;
+    }
     // Create new PointsDetail entry
     var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: transfer.amount_symbol, permlink: permlink, user: user._id, typeTransaction: type._id, timestamp: transfer.timestamp, timestampString: utils.formatDate(transfer.timestamp), requestType: requestType});
     pointsDetail = await pointsDetail.save();
@@ -588,7 +610,8 @@ async function updateSteemplusPointsComments(comments, totalSteem, totalVests)
       else
         type = await TypeTransaction.findOne({name: 'Donation'}); 
     }
-
+    var ratioSBDSteem = findSteemplusPrice(comment.created);
+    console.log(comment.created, ratioSBDSteem);
     // Get the amount of the transaction
     var amount = steem.formatter.vestToSteem(parseFloat(comment.reward), totalVests, totalSteem).toFixed(3);
     // Get the number of Steemplus points
@@ -641,14 +664,36 @@ function getLastBlockID() {
 function storeSteemPriceInBlockchain(priceSteem, priceSBD)
 {
   const accountName = "cedricguillas";
-  const json = JSON.stringify([{
+  const json = JSON.stringify({priceHistory: {
     priceSteem: priceSteem,
     priceSBD: priceSBD
-  }]);
+  }});
 
-  steem.broadcast.transfer(config.wif || process.env.WIF_TEST_2, accountName, accountName, "0.001 SBD", json, function(err, result) {
-    console.log(err, result);
-  });
+  // steem.broadcast.transfer(config.wif || process.env.WIF_TEST_2, accountName, accountName, "0.001 SBD", json, function(err, result) {
+  //   console.log(err, result);
+  // });
+}
+
+function findSteemplusPrice(date){
+  let minuteDate = date.getUTCMinutes() - date.getUTCMinutes()%10;
+  let periodDate = `${date.getUTCFullYear()}-${date.getUTCMonth()+1}-${date.getUTCDate()} ${date.getUTCHours()}:${minuteDate}:00.000`;
+  for(entry of priceHistory){
+    let minuteDateEntry = entry.timestamp.getUTCMinutes() - entry.timestamp.getUTCMinutes()%10;
+    let periodDateEntry = `${entry.timestamp.getUTCFullYear()}-${entry.timestamp.getUTCMonth()+1}-${entry.timestamp.getUTCDate()} ${entry.timestamp.getUTCHours()}:${minuteDateEntry}:00.000`;
+  
+    if(periodDate === periodDateEntry){
+      let entryJSON = JSON.parse(entry.memo);
+      let price = entryJSON.priceSteem / entryJSON.priceSBD;
+      return price;
+    }
+  }
+  let dateNow = new Date();
+  let minuteNow = dateNow.getUTCMinutes() - dateNow.getUTCMinutes()%10;
+  let periodNow = `${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth()+1}-${dateNow.getUTCDate()} ${dateNow.getUTCHours()}:${minuteNow}:00.000`;
+  
+  if(periodNow === periodDate) return 
+  else return 1;
+  return currentRatioSBDSteem;
 }
 
 module.exports = appRouter;
