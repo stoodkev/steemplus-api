@@ -510,7 +510,7 @@ async function updateSteemplusPointsTransfers(transfers)
           else if(reimbursement.memo.includes(transfer.memo.replace('steemplus https://steemit.com/', '').split('/')[2]))
           {
             if(reimbursement.memo.includes('You got an upgoat')){
-              permlink = transfer.memo.replace('steemplus https://steemit.com/', '').split('/')[2];
+              permlink = transfer.memo.replace('steemplus ', '');
               amount = (transfer.amount - reimbursement.amount).toFixed(2) * 0.01;
               accountName = transfer.from;
             }
@@ -531,6 +531,7 @@ async function updateSteemplusPointsTransfers(transfers)
         continue;
       } 
       accountName = transfer.memo.match(/Sender: @([a-zA-Z0-9\.-]*),/i)[1];
+      permlink = transfer.memo.match(/Post: (.*)/)[1];
       amount = transfer.amount; // 1% already counted
       requestType = 1;
     }
