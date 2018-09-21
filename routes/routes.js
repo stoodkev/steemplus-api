@@ -669,7 +669,7 @@ function storeSteemPriceInBlockchain(priceSteem, priceSBD)
     const json = JSON.stringify({priceHistory: {
       priceSteem: priceSteem,
       priceSBD: priceSBD,
-      priceBTC: response.result['Bid'])
+      priceBTC: response.result['Bid']
     }});
 
     steem.broadcast.transfer(config.wif_bot || process.env.WIF_TEST_2, accountName, accountName, "0.001 SBD", json, function(err, result) {
