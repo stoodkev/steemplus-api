@@ -664,14 +664,17 @@ function getLastBlockID() {
 // This will help us to be able anytime to recreate the exact same database.
 function storeSteemPriceInBlockchain(priceSteem, priceSBD)
 {
-  const accountName = "steemplus-bot";
-  const json = JSON.stringify({priceHistory: {
-    priceSteem: priceSteem,
-    priceSBD: priceSBD
-  }});
+  getJSON('https://bittrex.com/api/v1.1/public/getticker?market=BTC-SBD', function(err, response){
+    const accountName = "steemplus-bot";
+    const json = JSON.stringify({priceHistory: {
+      priceSteem: priceSteem,
+      priceSBD: priceSBD,
+      priceBTC: response.result['Bid'])
+    }});
 
-  steem.broadcast.transfer(config.wif_bot || process.env.WIF_TEST_2, accountName, accountName, "0.001 SBD", json, function(err, result) {
-    console.log(err, result);
+    steem.broadcast.transfer(config.wif_bot || process.env.WIF_TEST_2, accountName, accountName, "0.001 SBD", json, function(err, result) {
+      console.log(err, result);
+    });
   });
 }
 
