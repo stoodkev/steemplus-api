@@ -20,6 +20,7 @@ let config={
   local_db_config:local_db_config,
   bot:process.env.BOT,
   wif:process.env.WIF,
+  wif_bot:process.env.WIF_BOT,
   key:process.env.MASTER,
   payPostKey:process.env.PAY_POST_KEY,
   payActKey:process.env.PAY_ACT_KEY

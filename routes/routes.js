@@ -361,8 +361,8 @@ var appRouter = function (app) {
             SELECT timestamp, memo
             FROM TxTransfers
             WHERE timestamp > '2018-08-03 12:05:42.000'
-            and [from] = 'cedricguillas'
-            and [to] = 'cedricguillas'
+            and [from] = 'steemplus-bot'
+            and [to] = 'steemplus-bot'
             and memo LIKE '%priceHistory%'
             ORDER BY timestamp DESC;
             `)})
@@ -664,13 +664,13 @@ function getLastBlockID() {
 // This will help us to be able anytime to recreate the exact same database.
 function storeSteemPriceInBlockchain(priceSteem, priceSBD)
 {
-  const accountName = "cedricguillas";
+  const accountName = "steemplus-bot";
   const json = JSON.stringify({priceHistory: {
     priceSteem: priceSteem,
     priceSBD: priceSBD
   }});
 
-  steem.broadcast.transfer(config.wif || process.env.WIF_TEST_2, accountName, accountName, "0.001 SBD", json, function(err, result) {
+  steem.broadcast.transfer(config.wif_bot || process.env.WIF_TEST_2, accountName, accountName, "0.001 SBD", json, function(err, result) {
     console.log(err, result);
   });
 }
