@@ -19,7 +19,9 @@ let config={
   config_api:config_api,
   local_db_config:local_db_config,
   bot:process.env.BOT,
+  wif_test:process.env.WIF_TEST,
   wif:process.env.WIF,
+  wif_bot:process.env.WIF_BOT,
   key:process.env.MASTER,
   payPostKey:process.env.PAY_POST_KEY,
   payActKey:process.env.PAY_ACT_KEY

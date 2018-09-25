@@ -6,9 +6,13 @@ var getJSON = require('get-json');
 var User = require('../models/user');
 var PointsDetail = require('../models/pointsDetail');
 var TypeTransaction = require('../models/typeTransaction');
+var LastVote = require('../models/lastVote');
 var totalVests = null;
 var totalSteem = null;
 var ratioSBDSteem = null;
+var votingAccount = 'steem-plus';
+var currentRatioSBDSteem = null;
+var steemPricesHistory = null;
 
 var lastPermlink=null;
 var appRouter = function (app) {
@@ -342,74 +346,324 @@ var appRouter = function (app) {
       res.status(403).send("Permission denied");
       return;
     }
-    // Get dynamic properties of steem to be able to calculate prices
-    Promise.all([steem.api.getDynamicGlobalPropertiesAsync(), getPriceSBDAsync(), getPriceSteemAsync()])
-    .then(async function(values)
-    {
-      totalSteem = totalSteem = Number(values["0"].total_vesting_fund_steem.split(' ')[0]);
-      totalVests = Number(values["0"].total_vesting_shares.split(' ')[0]);
-      // Calculate ration SBD/Steem
-      ratioSBDSteem = values[2] / values[1];
+    setTimeout(function(){
+      // Get dynamic properties of steem to be able to calculate prices
+      Promise.all([steem.api.getDynamicGlobalPropertiesAsync(), getPriceSBDAsync(), getPriceSteemAsync(), getLastBlockID()])
+      .then(async function(values)
+      {
+        totalSteem = totalSteem = Number(values["0"].total_vesting_fund_steem.split(' ')[0]);
+        totalVests = Number(values["0"].total_vesting_shares.split(' ')[0]);
+        // Calculate ration SBD/Steem
+        currentRatioSBDSteem = values[2] / values[1];
+        storeSteemPriceInBlockchain(values[2], values[1]);
 
-      // Get the last entry the requestType 0 (Comments)
-      var lastEntry = await PointsDetail.find({requestType: 0}).sort({timestamp: -1}).limit(1);
-      // Get the creation date of the last entry
-      var lastEntryDate = null;
-      if(lastEntry[0] !== undefined)
-        lastEntryDate = lastEntry[0].timestampString;
-      else
+        // get price history
+        await new sql.ConnectionPool(config.config_api).connect().then(pool => {
+          return pool.request()
+          .query(`
+            SELECT timestamp, memo
+            FROM TxTransfers
+            WHERE timestamp > '2018-08-03 12:05:42.000'
+            and [from] = 'steemplus-bot'
+            and [to] = 'steemplus-bot'
+            and memo LIKE '%priceHistory%'
+            ORDER BY timestamp DESC;
+            `)})
+          .then(result => {
+            // get result
+            priceHistory = result.recordsets[0];
+            sql.close();
+          }).catch(error => {console.log(error);
+        sql.close();});
+
+        let delaySteemSQL = (parseInt(values[0].last_irreversible_block_num) - parseInt(values[3])) * 3;
+
+        // Get the last entry the requestType 0 (Comments)
+        var lastEntry = await PointsDetail.find({requestType: 0}).sort({timestamp: -1}).limit(1);
+        // Get the creation date of the last entry
+        var lastEntryDate = null;
+        if(lastEntry[0] !== undefined)
+          lastEntryDate = lastEntry[0].timestampString;
+        else
+          lastEntryDate = '2018-08-10 12:05:42.000'; // This date is the steemplus point annoncement day + 7 days for rewards because rewards come after 7 days.
+        // Wait for SteemSQL's query result before starting the second request
+        // We decided to wait to be sure this function won't try to update the same row twice at the same time
+        await new sql.ConnectionPool(config.config_api).connect().then(pool => {
+          return pool.request()
+          .query(`
+            SELECT
+              REPLACE(VOCommentBenefactorRewards.reward, ' VESTS', '') as reward, VOCommentBenefactorRewards.timestamp as created , Comments.author, Comments.title, Comments.url, Comments.permlink, Comments.beneficiaries, Comments.total_payout_value
+            FROM
+              VOCommentBenefactorRewards
+              INNER JOIN Comments ON VOCommentBenefactorRewards.author = Comments.author AND VOCommentBenefactorRewards.permlink = Comments.permlink
+            WHERE 
+              benefactor = 'steemplus-pay'
+            AND timestamp > CONVERT(datetime, '${lastEntryDate}')
+            ORDER BY created ASC;
+            `)})
+          .then(result => {
+            // get result
+            var comments = result.recordsets[0];
+            // Start data processing
+            updateSteemplusPointsComments(comments, totalSteem, totalVests);
+            sql.close();
+          }).catch(error => {console.log(error);
+        sql.close();});
+
+        // Get the last entry for the second request type (Transfers : Postpromoter)
+        lastEntry = await PointsDetail.find({requestType: 1}).sort({timestamp: -1}).limit(1);
+        var lastEntryDate = null;
+        if(lastEntry[0] !== undefined)
+          lastEntryDate = lastEntry[0].timestampString;
+        else
         lastEntryDate = '2018-08-03 12:05:42.000'; // This date is the steemplus point annoncement day
-      // Wait for SteemSQL's query result before starting the second request
-      // We decided to wait to be sure this function won't try to update the same row twice at the same time
-      await new sql.ConnectionPool(config.config_api).connect().then(pool => {
-        return pool.request()
-        .query(`
-          SELECT
-            REPLACE(VOCommentBenefactorRewards.reward, ' VESTS', '') as reward, Comments.created, Comments.author, Comments.title, Comments.url, Comments.permlink, Comments.beneficiaries, Comments.total_payout_value
-          FROM
-            VOCommentBenefactorRewards
-            INNER JOIN Comments ON VOCommentBenefactorRewards.author = Comments.author AND VOCommentBenefactorRewards.permlink = Comments.permlink
-          WHERE 
-            benefactor = 'steemplus-pay'
-          AND created > CONVERT(datetime, '${lastEntryDate}')
-          ORDER BY created ASC;
-          `)})
-        .then(result => {
-          // get result
-          var comments = result.recordsets[0];
-          // Start data processing
-          updateSteemplusPointsComments(comments, totalSteem, totalVests);
-          sql.close();
-        }).catch(error => {console.log(error);
-      sql.close();});
 
-      // Get the last entry for the second request type (Transfers : MinnowBooster or Postpromoter)
-      lastEntry = await PointsDetail.find({requestType: 1}).sort({timestamp: -1}).limit(1);
-      var lastEntryDate = null;
-      if(lastEntry[0] !== undefined)
-        lastEntryDate = lastEntry[0].timestampString;
-      else
-      lastEntryDate = '2018-08-03 12:05:42.000'; // This date is the steemplus point annoncement day
-      // Execute SteemSQL query
-      await new sql.ConnectionPool(config.config_api).connect().then(pool => {
-        return pool.request()
-        .query(`
-          SELECT timestamp, [from], [to], amount, amount_symbol, memo 
-          FROM TxTransfers 
-          WHERE timestamp > CONVERT(datetime, '${lastEntryDate}') 
-          AND memo LIKE 'steemplus%' 
-          AND ([to] = 'minnowbooster' OR [from] = 'postpromoter');
-          `)})
-        .then(result => {
-          var transfers = result.recordsets[0];
-          updateSteemplusPointsTransfers(transfers);
-          res.status(200).send("OK");
-          sql.close();
-        }).catch(error => {console.log(error);
-      sql.close();});
+        // Get the last entry for the second request type (Transfers : MinnowBooster)
+        lastEntryMB = await PointsDetail.find({requestType: 2}).sort({timestamp: -1}).limit(1);
+        var lastEntryDateMB = null;
+        if(lastEntryMB[0] !== undefined)
+          lastEntryDateMB = lastEntryMB[0].timestampString;
+        else
+        lastEntryDateMB = '2018-08-03 12:05:42.000'; // This date is the steemplus point annoncement day
+        // Execute SteemSQL query
+        await new sql.ConnectionPool(config.config_api).connect().then(pool => {
+          return pool.request()
+          .query(`
+            SELECT timestamp, [from], [to], amount, amount_symbol, memo 
+            FROM TxTransfers 
+            WHERE
+            (
+                ([from] = 'minnowbooster' and memo LIKE '%memo:%' and timestamp > CONVERT(datetime, '${lastEntryDateMB}'))
+              OR 
+                ([from] = 'minnowbooster' and memo LIKE '%permlink:%' and timestamp > CONVERT(datetime, '${lastEntryDateMB}'))
+              OR
+                ([from] = 'minnowbooster' and memo LIKE '%Post:%' and timestamp > CONVERT(datetime, '${lastEntryDateMB}'))
+              OR
+                ([to] = 'minnowbooster' and memo LIKE 'steemplus%' AND timestamp < DATEADD(second, -${delaySteemSQL+10*60}, GETUTCDATE()) AND timestamp > CONVERT(datetime, '${lastEntryDateMB}'))
+              OR
+                ([to] = 'steemplus-pay' AND [from] != 'steemplus-pay' AND [from] != 'minnowbooster' AND timestamp > CONVERT(datetime, '${lastEntryDate}'))
+            );
+            `)})
+          .then(result => {
+            var transfers = result.recordsets[0];
+            updateSteemplusPointsTransfers(transfers);
+            sql.close();
+          }).catch(error => {console.log(error);
+        sql.close();});
+      });
+    },0);
+    res.status(200).send("OK");
+  });
+
+  // Bot for Steemplus daily vote
+  app.get("/job/bot-vote/:key", function(req, res){
+    if(req.params.key !== config.key)
+    {
+      res.status(403).send("Permission denied");
+      return;
+    }
+    // get Steem-plus voting power
+    steem.api.getAccounts([votingAccount], function(err, result) {
+      if (err) console.log(err);
+      else 
+      {
+        let spAccount = result[0];
+        // Only start voting if the voting power is full
+        if(spAccount.voting_power === 10000)
+        {
+          // Find all the accounts names that has more than 0 points
+          User.find({nbPoints: {$gt: 0}}, 'accountName', function(err, users){
+            if(err) console.log(`Error while getting users : ${err}`);
+            else
+            {
+              LastVote.findOne({}, function(err, lastVote){
+                console.log(lastVote);
+                let dateVote = (lastVote === null ? 'DATEADD(hour,-24*7, GETUTCDATE())' : `'${lastVote.date}'`)
+                // Get a list with those names
+                let usernameList = [];
+                users.map((user) => usernameList.push(`'${user.accountName}'`));
+                // Execute a SQL query that get the last article from all those users if their last article has been posted
+                // less than 24h ago
+                console.log(`SELECT permlink, title, Comments.author, url, created
+                  FROM Comments
+                  INNER JOIN
+                  (
+                    SELECT author, max(created) as maxDate
+                    FROM Comments 
+                    WHERE depth = 0 
+                    AND author IN (${usernameList.join(',')})
+                    AND created >= ${dateVote}
+                    GROUP BY author
+                  ) t
+                  ON Comments.author = t.author
+                  AND created = t.maxDate;`)
+                new sql.ConnectionPool(config.config_api).connect().then(pool => {
+                return pool.request()
+                .query(`
+                  SELECT permlink, title, Comments.author, url, created
+                  FROM Comments
+                  INNER JOIN
+                  (
+                    SELECT author, max(created) as maxDate
+                    FROM Comments 
+                    WHERE depth = 0 
+                    AND author IN (${usernameList.join(',')})
+                    AND created > ${dateVote}
+                    GROUP BY author
+                  ) t
+                  ON Comments.author = t.author
+                  AND created = t.maxDate;
+                  `)})
+                .then(result => {
+                  var posts = result.recordsets[0];
+                  votingRoutine(spAccount, posts);
+                  res.status(200).send("OK");
+                  sql.close();
+                }).catch(error => {console.log(error);
+                sql.close();});
+              });
+            }
+          });
+        }
+        else
+          console.log(`Voting power is only ${spAccount.voting_power/100.00}%... Need to wait more`);
+
+      }
     });
   });
 
+}
+
+// Function used to process the voting routine
+// @parameter spAccount : SteemPlus account
+// @parameter posts : posts that have to be voted for
+async function votingRoutine(spAccount, posts)
+{
+  if(posts.length === 0){
+    console.log('No new post to vote! End!');
+    return;
+  } 
+
+  let totalSPP = 0;
+  for(let post of posts)
+  {
+    let user = await User.findOne({accountName: post.author});
+    post.nbPoints = user.nbPoints;
+    totalSPP += user.nbPoints;
+  }
+
+  let totalPercentage = 0;
+  for(let post of posts)
+  {
+    let percentage = Math.floor(post.nbPoints/totalSPP*100000);
+    post.percentage = percentage;
+    totalPercentage += percentage;
+  }
+  posts.sort(function(a, b){return b.nbPoints-a.nbPoints});
+
+  // Updated percentages until every post has percentage under 100
+  while(hasUncorrectPercent(posts))
+  {
+    updatePercentages(posts);
+  }
+  // Sort the list to make sure first votes are going to the one with maximum SPP
+  posts.sort(function(a, b){return b.nbPoints-a.nbPoints});
+
+  var nbPostsSent = -1;
+  // Start voting
+  console.log(`Will try to vote for ${posts.length} post(s)`);
+  for(let post of posts)
+  {
+    nbPostsSent++;
+    (function(indexPost)
+    {
+      setTimeout(function()
+      {
+        console.log(`Post #${indexPost}/${posts.length}`);
+        if(post.percentage === 0)
+        {
+          console.log(`Vote too low : Not voting for ${post.permlink} written by ${post.author}`);
+        }
+        else
+        {
+          console.log(`Trying to vote for ${post.permlink} written by ${post.author}, value : ${post.percentage}`);
+          steem.broadcast.vote(config.wif, votingAccount, post.author, post.permlink, post.percentage, function(err, result) {
+            if(err)
+            {
+              let errorString = err.toString();
+              if(/Voting weight is too small/.test(errorString))
+                console.log(`Vote too low : Not voting for ${post.permlink} written by ${post.author}`);
+              else console.log(err);
+            }
+            else 
+            {
+              console.log(`Succeed voting for ${post.permlink} written by ${post.author}, value : ${post.percentage}`);
+              console.log(`Trying to comment for ${post.permlink} written by ${post.author}`);
+              steem.broadcast.comment(config.wif, post.author, post.permlink, votingAccount, post.permlink+"---vote-steemplus", "SteemPlus upvote", utils.commentVotingBot(post), {}, function(err, result) {
+                if(err) console.log(err);
+                else console.log(`Succeed commenting for ${post.permlink} written by ${post.author}`);
+              });
+            }
+          });
+        }
+      },30*1000*nbPostsSent); // Can't comment more than once every 20 second so we decided to use 30sec in case blockchain is slow
+    })(nbPostsSent+1);
+  }
+  posts.sort(function(a, b){return new Date(b.created)-new Date(a.created)});
+  LastVote.findOne({}, function(err, lastVote){
+    if(lastVote === null)
+      var lastVote = new LastVote({date: utils.formatDate(posts[0].created)});
+    else 
+      lastVote.date = utils.formatDate(posts[0].created);
+    
+    lastVote.save();
+  });
+}
+
+// Function used to recalculate the percentages if there is at least one > 100
+// @parameter posts : list of the post that will be upvoted
+function updatePercentages(posts)
+{
+  // total of excess percentage
+  let additionnalPercentage = 0.00; 
+  // total SPP for the posts that will be given additional percentage 
+  let totalSPPnew = 0.00;
+  for(let post of posts)
+  {
+    if(post.percentage >= 10000)
+    {
+      // If percentage > 100 we put it back to 100.00 and add the difference with 100 to additionnalPercentage
+      additionnalPercentage += (post.percentage - 10000);
+      post.percentage = 10000;
+    }
+    else
+      totalSPPnew += post.nbPoints; // If not, counts the 'new Points'
+  }
+
+
+  let totalNewPercentage = 0.00;
+  for(let post of posts)
+  {
+    let percentage = 10000;
+    if(post.percentage !== 10000)
+    {
+      // For each post that has a percentage different than 100.00, add some more percentage.
+      let percentage = Math.floor(post.nbPoints/totalSPPnew*additionnalPercentage);
+      post.percentage = Math.floor(post.percentage+percentage);
+    }
+    totalNewPercentage += percentage;
+  }
+}
+
+// Function used to check if there is still percentage > 100 in the list
+// @parameter posts : list of the post that will be upvoted
+function hasUncorrectPercent(posts)
+{
+  for(let post of posts)
+  {
+    if(post.percentage > 10000) return true;
+  }
+  return false;
 }
 
 // Function used to process the data from SteemSQL for requestType == 1
@@ -418,35 +672,112 @@ async function updateSteemplusPointsTransfers(transfers)
 {
   // Number of new entry in the DB
   var nbPointDetailsAdded = 0;
-  console.log(`Adding ${transfers.length} new transfer(s) to DB`);
+  var nbMinnowAccepted = 0;
+  var nbMinnowRejected = 0;
+  var nbPostProAccepted = 0;
+  var nbPostProRejected = 0;
+  let reimbursementList = transfers.filter(transfer => transfer.from === 'minnowbooster');
+  let transfersList = transfers.filter(transfer => transfer.from !== 'minnowbooster');
+
+  console.log(`Adding ${transfersList.length} new transfer(s) to DB`);
   // Iterate on transfers
-  for (const transfer of transfers) {
+  for (const transfer of transfersList) {
+    var reason = null;
+    // Init default values
+
+    var permlink = '';
+    var accountName = null;
+    // Get the amount of the transfer
+    var amount = transfer.amount * 0.01; //Steemplus take 1% of the transaction
+
+    var requestType = null;
+    
+    // Get type
+    var type = null;
+    if(transfer.to === 'minnowbooster'){
+      if(transfer.memo.toLowerCase().replace('steemplus') === '') 
+      {
+        continue;
+      }
+      type = await TypeTransaction.findOne({name: 'MinnowBooster'});
+      for(const reimbursement of reimbursementList)
+      {
+        if(transfer.from === reimbursement.to)
+        {
+          if(transfer.memo.replace('steemplus https://steemit.com/', '').split('/')[2] === undefined)
+          {
+            if(reimbursement.memo.includes(transfer.memo.replace('steemplus ', '')))
+            {
+              if(reimbursement.memo.includes('You got an upgoat')){
+                amount = (transfer.amount - reimbursement.amount).toFixed(2) * 0.01;
+                permlink = transfer.memo.replace('steemplus ', '');
+                accountName = transfer.from;
+              }
+              else {
+                reason = reimbursement.memo;
+                break;
+              }
+            }
+          }
+          else if(reimbursement.memo.includes(transfer.memo.replace('steemplus https://steemit.com/', '').split('/')[2]))
+          {
+            if(reimbursement.memo.includes('You got an upgoat')){
+              permlink = transfer.memo.replace('steemplus ', '');
+              amount = (transfer.amount - reimbursement.amount).toFixed(2) * 0.01;
+              accountName = transfer.from;
+            }
+            else {
+              reason = reimbursement.memo;
+              break;
+            }
+          }
+        }
+      }
+      requestType = 2;
+    }
+    else if(transfer.from === 'postpromoter' && transfer.to === 'steemplus-pay')
+    {
+      type = await TypeTransaction.findOne({name: 'PostPromoter'});
+      if(transfer.memo.match(/Sender: @([a-zA-Z0-9\.-]*),/i) === null)
+      {
+        continue;
+      } 
+      accountName = transfer.memo.match(/Sender: @([a-zA-Z0-9\.-]*),/i)[1];
+      permlink = transfer.memo.match(/Post: (.*)/)[1];
+      amount = transfer.amount; // 1% already counted
+      requestType = 1;
+    }
+    
+    if(type === null)
+    {
+      continue;
+    } 
+    if(reason !== null)
+    {
+      continue;
+    } 
     // Check if user is already in DB
-    var user = await User.findOne({accountName: transfer.from});
+
+    var user = await User.findOne({accountName: accountName});
     if(user === null)
     {
       // If not, create it
-      user = new User({accountName: transfer.from, nbPoints: 0});
+      user = new User({accountName: accountName, nbPoints: 0});
       user = await user.save();
     }
 
-    // Get type
-    var type = 'default';
-    if(transfer.to === 'minnowbooster')
-      type = await TypeTransaction.findOne({name: 'MinnowBooster'});
-    else if(transfer.to === 'postpromoter')
-      type = await TypeTransaction.findOne({name: 'PostPromoter'});
-
-    // Get the amount of the transfer
-    var amount = transfer.amount * 0.01; //Steemplus take 1% of the transaction
+    var ratioSBDSteem = findSteemplusPrice(transfer.timestamp);
     // We decided that 1SPP == 0.01 SBD
     var nbPoints = 0;
     if(transfer.amount_symbol === "SBD")
       nbPoints = amount * 100;
     else if(transfer.amount_symbol === "STEEM")
+    {
+      
       nbPoints = amount * ratioSBDSteem * 100;
+    }
     // Create new PointsDetail entry
-    var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: transfer.amount_symbol, permlink: '', user: user._id, typeTransaction: type._id, timestamp: transfer.timestamp, timestampString: utils.formatDate(transfer.timestamp), requestType: 1});
+    var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: transfer.amount_symbol, permlink: permlink, user: user._id, typeTransaction: type._id, timestamp: transfer.timestamp, timestampString: utils.formatDate(transfer.timestamp), requestType: requestType});
     pointsDetail = await pointsDetail.save();
     
     // Update user account
@@ -494,7 +825,7 @@ async function updateSteemplusPointsComments(comments, totalSteem, totalVests)
       else
         type = await TypeTransaction.findOne({name: 'Donation'}); 
     }
-
+    var ratioSBDSteem = findSteemplusPrice(comment.created);
     // Get the amount of the transaction
     var amount = steem.formatter.vestToSteem(parseFloat(comment.reward), totalVests, totalSteem).toFixed(3);
     // Get the number of Steemplus points
@@ -526,6 +857,61 @@ function getPriceSBDAsync() {
           resolve(response.result['Bid']);
         });
     });
+}
+
+// Function used to get the last block stored in SteemSQL. We use the result of this request to know if SteemSQL is synchronized with the blockchain
+function getLastBlockID() {
+  return new Promise(function(resolve, reject) {
+      new sql.ConnectionPool(config.config_api).connect().then(pool => {
+      return pool.request()
+      .query("select top 1 block_num from Blocks ORDER BY timestamp DESC")})
+      .then(result => {
+        resolve(result.recordsets[0][0].block_num);
+        sql.close();
+      }).catch(error => {console.log(error);
+    sql.close();});
+  });
+}
+
+// This function is used to store the price of steem and SBD in the blockchain,
+// This will help us to be able anytime to recreate the exact same database.
+function storeSteemPriceInBlockchain(priceSteem, priceSBD)
+{
+  getJSON('https://bittrex.com/api/v1.1/public/getticker?market=BTC-SBD', function(err, response){
+    const accountName = "steemplus-bot";
+    const json = JSON.stringify({priceHistory: {
+      priceSteem: priceSteem,
+      priceSBD: priceSBD,
+      priceBTC: response.result['Bid']
+    }});
+
+    steem.broadcast.transfer(config.wif_bot || process.env.WIF_TEST_2, accountName, accountName, "0.001 SBD", json, function(err, result) {
+      console.log(err, result);
+    });
+  });
+}
+
+// Get price for a chosen date
+function findSteemplusPrice(date){
+
+  let dateNow = new Date();
+  let minuteNow = dateNow.getUTCMinutes() - dateNow.getUTCMinutes()%10;
+  let periodNow = `${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth()+1}-${dateNow.getUTCDate()} ${dateNow.getUTCHours()}:${minuteNow}:00.000`;
+  let minuteDate = date.getUTCMinutes() - date.getUTCMinutes()%10;
+  let periodDate = `${date.getUTCFullYear()}-${date.getUTCMonth()+1}-${date.getUTCDate()} ${date.getUTCHours()}:${minuteDate}:00.000`;
+  if(periodNow === periodDate) return currentRatioSBDSteem;
+  else
+  {
+    let prices = priceHistory.filter(p => p.timestamp < date);
+  
+    if(prices.length === 0) return 1;
+    else {
+      let priceJSON = JSON.parse(prices[0].memo).priceHistory;
+      if(priceJSON === undefined) return 1;
+      else
+        return priceJSON.priceSteem / priceJSON.priceSBD;
+    }
+  }
 }
 
 module.exports = appRouter;
