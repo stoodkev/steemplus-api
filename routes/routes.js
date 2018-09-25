@@ -6,6 +6,7 @@ var getJSON = require('get-json');
 var User = require('../models/user');
 var PointsDetail = require('../models/pointsDetail');
 var TypeTransaction = require('../models/typeTransaction');
+var LastVote = require('../models/lastVote');
 var totalVests = null;
 var totalSteem = null;
 var ratioSBDSteem = null;
@@ -475,35 +476,52 @@ var appRouter = function (app) {
             if(err) console.log(`Error while getting users : ${err}`);
             else
             {
-              // Get a list with those names
-              let usernameList = [];
-              users.map((user) => usernameList.push(`'${user.accountName}'`));
-              // Execute a SQL query that get the last article from all those users if their last article has been posted
-              // less than 24h ago
-              new sql.ConnectionPool(config.config_api).connect().then(pool => {
-              return pool.request()
-              .query(`
-                SELECT permlink, title, Comments.author, url, created
-                FROM Comments
-                INNER JOIN
-                (
-                  SELECT author, max(created) as maxDate
-                  FROM Comments 
-                  WHERE depth = 0 
-                  AND author IN (${usernameList.join(',')})
-                  AND created >= DATEADD(hour,-24, GETUTCDATE())
-                  GROUP BY author
-                ) t
-                ON Comments.author = t.author
-                AND created = t.maxDate;
-                `)})
-              .then(result => {
-                var posts = result.recordsets[0];
-                votingRoutine(spAccount, posts);
-                res.status(200).send("OK");
-                sql.close();
-              }).catch(error => {console.log(error);
-            sql.close();});
+              LastVote.findOne({}, function(err, lastVote){
+                console.log(lastVote);
+                let dateVote = (lastVote === null ? 'DATEADD(hour,-24*7, GETUTCDATE())' : `'${lastVote.date}'`)
+                // Get a list with those names
+                let usernameList = [];
+                users.map((user) => usernameList.push(`'${user.accountName}'`));
+                // Execute a SQL query that get the last article from all those users if their last article has been posted
+                // less than 24h ago
+                console.log(`SELECT permlink, title, Comments.author, url, created
+                  FROM Comments
+                  INNER JOIN
+                  (
+                    SELECT author, max(created) as maxDate
+                    FROM Comments 
+                    WHERE depth = 0 
+                    AND author IN (${usernameList.join(',')})
+                    AND created >= ${dateVote}
+                    GROUP BY author
+                  ) t
+                  ON Comments.author = t.author
+                  AND created = t.maxDate;`)
+                new sql.ConnectionPool(config.config_api).connect().then(pool => {
+                return pool.request()
+                .query(`
+                  SELECT permlink, title, Comments.author, url, created
+                  FROM Comments
+                  INNER JOIN
+                  (
+                    SELECT author, max(created) as maxDate
+                    FROM Comments 
+                    WHERE depth = 0 
+                    AND author IN (${usernameList.join(',')})
+                    AND created > ${dateVote}
+                    GROUP BY author
+                  ) t
+                  ON Comments.author = t.author
+                  AND created = t.maxDate;
+                  `)})
+                .then(result => {
+                  var posts = result.recordsets[0];
+                  votingRoutine(spAccount, posts);
+                  res.status(200).send("OK");
+                  sql.close();
+                }).catch(error => {console.log(error);
+                sql.close();});
+              });
             }
           });
         }
@@ -521,6 +539,11 @@ var appRouter = function (app) {
 // @parameter posts : posts that have to be voted for
 async function votingRoutine(spAccount, posts)
 {
+  if(posts.length === 0){
+    console.log('No new post to vote! End!');
+    return;
+  } 
+
   let totalSPP = 0;
   for(let post of posts)
   {
@@ -586,6 +609,15 @@ async function votingRoutine(spAccount, posts)
       },30*1000*nbPostsSent); // Can't comment more than once every 20 second so we decided to use 30sec in case blockchain is slow
     })(nbPostsSent+1);
   }
+  posts.sort(function(a, b){return new Date(b.created)-new Date(a.created)});
+  LastVote.findOne({}, function(err, lastVote){
+    if(lastVote === null)
+      var lastVote = new LastVote({date: utils.formatDate(posts[0].created)});
+    else 
+      lastVote.date = utils.formatDate(posts[0].created);
+    
+    lastVote.save();
+  });
 }
 
 // Function used to recalculate the percentages if there is at least one > 100
