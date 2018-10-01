@@ -17,10 +17,9 @@ exports.commentVotingBot=function(post)
 	return commentBody = `
 	<div>
 		<p>Hi, ${post.author}!</p>
-		<p>You just got a <b>${post.percentage}%</b> upvote by SteemPlus!</p>
-		<p>You can get higher rewards by using SteemPlus even more! Click <a target="_blank" href="https://steemit.com/utopian-io/@steem-plus/steemplus-points-calculation">here</a> to get more details about how to earn more <b>SteemPlus Points</b>.</p>
-		<p>You can also join us on Discord <a target= "_blank" href="https://discord.gg/7zX46q">https://discord.gg/7zX46q</a>.</p>
-		<p> If you like SteemPlus, don't forget to vote for @stoodkev as a witness. Only need to click <a target="_blank" href="https://v2.steemconnect.com/sign/account-witness-vote?witness=stoodkev&amp;approve=1">here</a>!</p>
+		<p>You just got a <b>${post.percentage}%</b> upvote from SteemPlus!</p>
+		<p>To get higher upvotes, earn more SteemPlus Points (SPP). On your Steemit wallet, check your SPP balance and click on "How to earn SPP?" to find out all the ways to earn.</p>
+    <p>If you're not using SteemPlus yet, please check our last posts in <a href="https://steemit.com/@steem-plus">here</a> to see the many ways in which SteemPlus can improve your Steem experience on Steemit and Busy.</p>
 	</div>`;
 }
 
