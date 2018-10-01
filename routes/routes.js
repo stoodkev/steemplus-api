@@ -903,7 +903,7 @@ function findSteemplusPrice(date){
     if(prices.length === 0) return {price: 1, totalSteem: 196552616.386, totalVests: 397056980101.127362};
     else {
       let priceJSON = JSON.parse(prices[0].memo).priceHistory;
-      if(priceJSON === undefined) return {price: 1, totalSteem: {price: 1, totalSteem: 196552616.386, totalVests: 397056980101.127362};
+      if(priceJSON === undefined) return {price: 1, totalSteem: 196552616.386, totalVests: 397056980101.127362};
       else
         return {price: (priceJSON.priceSteem / priceJSON.priceSBD), totalSteem: (priceJSON.totalSteem === null ? 196552616.386 : priceJSON.totalSteem), totalVests: (priceJSON.totalVests === null ? 397056980101.127362 : priceJSON.totalVests)};
     }
