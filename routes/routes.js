@@ -469,7 +469,7 @@ var appRouter = function (app) {
       {
         let spAccount = result[0];
         // Only start voting if the voting power is full
-        if(spAccount.voting_power === 10000)
+        if(utils.getVotingPowerPerAccount(spAccount) !== 100.00)
         {
           // Find all the accounts names that has more than 0 points
           User.find({nbPoints: {$gt: 0}}, 'accountName', function(err, users){
@@ -477,26 +477,12 @@ var appRouter = function (app) {
             else
             {
               LastVote.findOne({}, function(err, lastVote){
-                console.log(lastVote);
-                let dateVote = (lastVote === null ? 'DATEADD(hour,-24*7, GETUTCDATE())' : `'${lastVote.date}'`)
+                let dateVote = (lastVote === null ? 'DATEADD(hour,-24, GETUTCDATE())' : `'${lastVote.date}'`)
                 // Get a list with those names
                 let usernameList = [];
                 users.map((user) => usernameList.push(`'${user.accountName}'`));
                 // Execute a SQL query that get the last article from all those users if their last article has been posted
                 // less than 24h ago
-                console.log(`SELECT permlink, title, Comments.author, url, created
-                  FROM Comments
-                  INNER JOIN
-                  (
-                    SELECT author, max(created) as maxDate
-                    FROM Comments
-                    WHERE depth = 0
-                    AND author IN (${usernameList.join(',')})
-                    AND created >= ${dateVote}
-                    GROUP BY author
-                  ) t
-                  ON Comments.author = t.author
-                  AND created = t.maxDate;`)
                 new sql.ConnectionPool(config.config_api).connect().then(pool => {
                 return pool.request()
                 .query(`
@@ -526,7 +512,7 @@ var appRouter = function (app) {
           });
         }
         else
-          console.log(`Voting power is only ${spAccount.voting_power/100.00}%... Need to wait more`);
+          console.log(`Voting power (mana) is only ${utils.getVotingPowerPerAccount(spAccount)}%... Need to wait more`);
 
       }
     });
@@ -574,6 +560,7 @@ async function votingRoutine(spAccount, posts)
   console.log(`Will try to vote for ${posts.length} post(s)`);
   for(let post of posts)
   {
+    console.log(post);
     nbPostsSent++;
     (function(indexPost)
     {
