@@ -468,7 +468,7 @@ var appRouter = function (app) {
       {
         let spAccount = result[0];
         // Only start voting if the voting power is full
-        if(spAccount.voting_power === 10000)
+        if(utils.getVotingPowerPerAccount(spAccount) === 100.00)
         {
           // Find all the accounts names that has more than 0 points
           User.find({nbPoints: {$gt: 0}}, 'accountName', function(err, users){
@@ -508,7 +508,7 @@ var appRouter = function (app) {
           });
         }
         else
-          console.log(`Voting power is only ${spAccount.voting_power/100.00}%... Need to wait more`);
+          console.log(`Voting power (mana) is only ${utils.getVotingPowerPerAccount(spAccount)}%... Need to wait more`);
 
       }
     });
