@@ -12,6 +12,8 @@ var totalSteem = null;
 var ratioSBDSteem = null;
 var votingAccount = 'steem-plus';
 var currentRatioSBDSteem = null;
+var currentTotalSteem = null;
+var currentTotalVests = null;
 var steemPricesHistory = null;
 
 var lastPermlink=null;
@@ -351,11 +353,12 @@ var appRouter = function (app) {
       Promise.all([steem.api.getDynamicGlobalPropertiesAsync(), getPriceSBDAsync(), getPriceSteemAsync(), getLastBlockID()])
       .then(async function(values)
       {
-        totalSteem = totalSteem = Number(values["0"].total_vesting_fund_steem.split(' ')[0]);
-        totalVests = Number(values["0"].total_vesting_shares.split(' ')[0]);
+        currentTotalSteem = Number(values["0"].total_vesting_fund_steem.split(' ')[0]);
+        currentTotalVests = Number(values["0"].total_vesting_shares.split(' ')[0]);
+
         // Calculate ration SBD/Steem
         currentRatioSBDSteem = values[2] / values[1];
-        storeSteemPriceInBlockchain(values[2], values[1]);
+        storeSteemPriceInBlockchain(values[2], values[1], currentTotalSteem, currentTotalVests);
 
         // get price history
         await new sql.ConnectionPool(config.config_api).connect().then(pool => {
@@ -405,7 +408,7 @@ var appRouter = function (app) {
             // get result
             var comments = result.recordsets[0];
             // Start data processing
-            updateSteemplusPointsComments(comments, totalSteem, totalVests);
+            updateSteemplusPointsComments(comments);
             sql.close();
           }).catch(error => {console.log(error);
         sql.close();});
@@ -469,7 +472,7 @@ var appRouter = function (app) {
       {
         let spAccount = result[0];
         // Only start voting if the voting power is full
-        if(utils.getVotingPowerPerAccount(spAccount) !== 100.00)
+        if(utils.getVotingPowerPerAccount(spAccount) === 100.00)
         {
           // Find all the accounts names that has more than 0 points
           User.find({nbPoints: {$gt: 0}}, 'accountName', function(err, users){
@@ -780,7 +783,7 @@ async function updateSteemplusPointsTransfers(transfers)
 // @parameter comments : posts data received from SteemSQL
 // @parameter totalSteem : dynamic value from the blockchain
 // @parameter totalVests : dynamic value from the blockchain
-async function updateSteemplusPointsComments(comments, totalSteem, totalVests)
+async function updateSteemplusPointsComments(comments)
 {
   // Number of new entry in the DB
   var nbPointDetailsAdded = 0;
@@ -812,7 +815,11 @@ async function updateSteemplusPointsComments(comments, totalSteem, totalVests)
       else
         type = await TypeTransaction.findOne({name: 'Donation'});
     }
-    var ratioSBDSteem = findSteemplusPrice(comment.created);
+
+    var jsonPrice = findSteemplusPrice(comment.created);
+    var ratioSBDSteem = jsonPrice.price;
+    var totalSteem = jsonPrice.totalSteem;
+    var totalVests = jsonPrice.totalVests;
     // Get the amount of the transaction
     var amount = steem.formatter.vestToSteem(parseFloat(comment.reward), totalVests, totalSteem).toFixed(3);
     // Get the number of Steemplus points
@@ -862,14 +869,16 @@ function getLastBlockID() {
 
 // This function is used to store the price of steem and SBD in the blockchain,
 // This will help us to be able anytime to recreate the exact same database.
-function storeSteemPriceInBlockchain(priceSteem, priceSBD)
+function storeSteemPriceInBlockchain(priceSteem, priceSBD, totalSteem, totalVests)
 {
   getJSON('https://bittrex.com/api/v1.1/public/getticker?market=BTC-SBD', function(err, response){
     const accountName = "steemplus-bot";
     const json = JSON.stringify({priceHistory: {
       priceSteem: priceSteem,
       priceSBD: priceSBD,
-      priceBTC: response.result['Bid']
+      priceBTC: response.result['Bid'],
+      totalSteem: totalSteem,
+      totalVests: totalVests
     }});
 
     steem.broadcast.transfer(config.wif_bot || process.env.WIF_TEST_2, accountName, accountName, "0.001 SBD", json, function(err, result) {
@@ -886,17 +895,17 @@ function findSteemplusPrice(date){
   let periodNow = `${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth()+1}-${dateNow.getUTCDate()} ${dateNow.getUTCHours()}:${minuteNow}:00.000`;
   let minuteDate = date.getUTCMinutes() - date.getUTCMinutes()%10;
   let periodDate = `${date.getUTCFullYear()}-${date.getUTCMonth()+1}-${date.getUTCDate()} ${date.getUTCHours()}:${minuteDate}:00.000`;
-  if(periodNow === periodDate) return currentRatioSBDSteem;
+  if(periodNow === periodDate) return {price: currentRatioSBDSteem, totalSteem: currentTotalSteem, totalVests: currentTotalVests};
   else
   {
     let prices = priceHistory.filter(p => p.timestamp < date);
 
-    if(prices.length === 0) return 1;
+    if(prices.length === 0) return {price: 1, totalSteem: 196552616.386, totalVests: 397056980101.127362};
     else {
       let priceJSON = JSON.parse(prices[0].memo).priceHistory;
-      if(priceJSON === undefined) return 1;
+      if(priceJSON === undefined) return {price: 1, totalSteem: {price: 1, totalSteem: 196552616.386, totalVests: 397056980101.127362};
       else
-        return priceJSON.priceSteem / priceJSON.priceSBD;
+        return {price: (priceJSON.priceSteem / priceJSON.priceSBD), totalSteem: (priceJSON.totalSteem === null ? 196552616.386 : priceJSON.totalSteem), totalVests: (priceJSON.totalVests === null ? 397056980101.127362 : priceJSON.totalVests)};
     }
   }
 }
