@@ -17,12 +17,10 @@ exports.formatDate = function(string) {
 
 exports.commentVotingBot = function(post) {
   return (commentBody = `
-	<div>
-		<p>Hi, ${post.author}!</p>
-		<p>You just got a <b>${post.percentage}%</b> upvote from SteemPlus!</p>
-		<p>To get higher upvotes, earn more SteemPlus Points (SPP). On your Steemit wallet, check your SPP balance and click on "How to earn SPP?" to find out all the ways to earn.</p>
-    <p>If you're not using SteemPlus yet, please check our last posts in <a href="https://steemit.com/@steem-plus">here</a> to see the many ways in which SteemPlus can improve your Steem experience on Steemit and Busy.</p>
-	</div>`);
+	  Hi, ${post.author}!\n\n
+    You just got a **${post.percentage}%** upvote from SteemPlus!\n
+    To get higher upvotes, earn more SteemPlus Points (SPP). On your Steemit wallet, check your SPP balance and click on "How to earn SPP?" to find out all the ways to earn.\n
+    If you're not using SteemPlus yet, please check our last posts in [here](https://steemit.com/@steem-plus) to see the many ways in which SteemPlus can improve your Steem experience on Steemit and Busy.\n`);
 }
 
 exports.commentVotingBotTest=function(post)
