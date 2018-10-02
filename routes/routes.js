@@ -588,7 +588,7 @@ async function votingRoutine(spAccount, posts)
         else
         {
           console.log(`Trying to vote for ${post.permlink} written by ${post.author}, value : ${post.percentage}`);
-          steem.broadcast.vote(config.wif, votingAccount, post.author, post.permlink, post.percentage, function(err, result) {
+          steem.broadcast.vote(config.wif_test, votingAccount, post.author, post.permlink, post.percentage, function(err, result) {
             if(err)
             {
               let errorString = err.toString();
