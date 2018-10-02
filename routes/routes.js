@@ -472,8 +472,9 @@ var appRouter = function (app) {
       {
         let spAccount = result[0];
         // Only start voting if the voting power is full
-        if(utils.getVotingPowerPerAccount(spAccount) > 99.87 && process.env.CAN_VOTE === 'true')
+        if((utils.getVotingPowerPerAccount(spAccount) > 99.87 || process.env.FORCE_VOTE === 'true') && process.env.CAN_VOTE === 'true')
         {
+          console.log('start voting...');
           // Find all the accounts names that has more than 0 points
           User.find({nbPoints: {$gt: 0}}, 'accountName', function(err, users){
             if(err) console.log(`Error while getting users : ${err}`);
