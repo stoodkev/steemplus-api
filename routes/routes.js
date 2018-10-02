@@ -748,7 +748,6 @@ async function updateSteemplusPointsTransfers(transfers)
       requestType = 1;
     }
 
-    if(accountName === 'dynamicrypto') console.log(transfer);
     if(type === null)
     {
       console.log('refused type');
@@ -781,12 +780,12 @@ async function updateSteemplusPointsTransfers(transfers)
     }
     // Create new PointsDetail entry
     var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: transfer.amount_symbol, permlink: permlink, user: user._id, typeTransaction: type._id, timestamp: transfer.timestamp, timestampString: utils.formatDate(transfer.timestamp), requestType: requestType});
-    pointsDetail = await pointsDetail.save(function (err) {if(err !== null) console.log(err)});
+    pointsDetail = await pointsDetail.save();
 
     // Update user account
     user.pointsDetails.push(pointsDetail);
     user.nbPoints = user.nbPoints + nbPoints;
-    await user.save(function (err) {if(err !== null) console.log(err)});
+    await user.save();
     nbPointDetailsAdded++;
   }
   console.log(`Added ${nbPointDetailsAdded} pointDetail(s)`);
