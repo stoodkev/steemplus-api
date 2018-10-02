@@ -395,7 +395,7 @@ var appRouter = function (app) {
           return pool.request()
           .query(`
             SELECT
-              REPLACE(VOCommentBenefactorRewards.reward, ' VESTS', '') as reward, VOCommentBenefactorRewards.timestamp as created , Comments.author, Comments.title, Comments.url, Comments.permlink, Comments.beneficiaries, Comments.total_payout_value
+              VOCommentBenefactorRewards.sbd_payout, VOCommentBenefactorRewards.steem_payout, VOCommentBenefactorRewards.vesting_payout, VOCommentBenefactorRewards.timestamp as created , Comments.author, Comments.title, Comments.url, Comments.permlink, Comments.beneficiaries, Comments.total_payout_value
             FROM
               VOCommentBenefactorRewards
               INNER JOIN Comments ON VOCommentBenefactorRewards.author = Comments.author AND VOCommentBenefactorRewards.permlink = Comments.permlink
@@ -472,7 +472,7 @@ var appRouter = function (app) {
       {
         let spAccount = result[0];
         // Only start voting if the voting power is full
-        if(utils.getVotingPowerPerAccount(spAccount) === 100.00)
+        if(utils.getVotingPowerPerAccount(spAccount) > 99.87 && process.env.CAN_VOTE === 'true')
         {
           // Find all the accounts names that has more than 0 points
           User.find({nbPoints: {$gt: 0}}, 'accountName', function(err, users){
@@ -515,7 +515,17 @@ var appRouter = function (app) {
           });
         }
         else
-          console.log(`Voting power (mana) is only ${utils.getVotingPowerPerAccount(spAccount)}%... Need to wait more`);
+        {
+          if(process.env.CAN_VOTE === 'false'){
+            console.log('Voting bot disabled...');
+            res.status(200).send('Voting bot disabled...');
+          }
+          else{
+            let votingPowerSP = utils.getVotingPowerPerAccount(spAccount);
+            console.log(`Voting power (mana) is only ${votingPowerSP}%... Need to wait more`);
+            res.status(200).send(`Voting power (mana) is only ${votingPowerSP}%... Need to wait more`);
+          }
+        }
 
       }
     });
@@ -738,12 +748,15 @@ async function updateSteemplusPointsTransfers(transfers)
       requestType = 1;
     }
 
+    if(accountName === 'dynamicrypto') console.log(transfer);
     if(type === null)
     {
+      console.log('refused type');
       continue;
     }
     if(reason !== null)
     {
+      console.log('refused reason : ' + reason);
       continue;
     }
     // Check if user is already in DB
@@ -756,7 +769,7 @@ async function updateSteemplusPointsTransfers(transfers)
       user = await user.save();
     }
 
-    var ratioSBDSteem = findSteemplusPrice(transfer.timestamp);
+    var ratioSBDSteem = findSteemplusPrice(transfer.timestamp).price;
     // We decided that 1SPP == 0.01 SBD
     var nbPoints = 0;
     if(transfer.amount_symbol === "SBD")
@@ -768,12 +781,12 @@ async function updateSteemplusPointsTransfers(transfers)
     }
     // Create new PointsDetail entry
     var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: transfer.amount_symbol, permlink: permlink, user: user._id, typeTransaction: type._id, timestamp: transfer.timestamp, timestampString: utils.formatDate(transfer.timestamp), requestType: requestType});
-    pointsDetail = await pointsDetail.save();
+    pointsDetail = await pointsDetail.save(function (err) {if(err !== null) console.log(err)});
 
     // Update user account
     user.pointsDetails.push(pointsDetail);
     user.nbPoints = user.nbPoints + nbPoints;
-    await user.save(function (err) {});
+    await user.save(function (err) {if(err !== null) console.log(err)});
     nbPointDetailsAdded++;
   }
   console.log(`Added ${nbPointDetailsAdded} pointDetail(s)`);
@@ -820,10 +833,11 @@ async function updateSteemplusPointsComments(comments)
     var ratioSBDSteem = jsonPrice.price;
     var totalSteem = jsonPrice.totalSteem;
     var totalVests = jsonPrice.totalVests;
+
     // Get the amount of the transaction
-    var amount = steem.formatter.vestToSteem(parseFloat(comment.reward), totalVests, totalSteem).toFixed(3);
+    var amount = (((steem.formatter.vestToSteem(parseFloat(comment.vesting_payout), totalVests, totalSteem).toFixed(3) + parseFloat(comment.steem_payout)) * ratioSBDSteem) + parseFloat(comment.sbd_payout)).toFixed(3);
     // Get the number of Steemplus points
-    var nbPoints = amount * ratioSBDSteem * 100;
+    var nbPoints = amount * 100;
     var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: 'SP', permlink: comment.permlink, url:comment.url, title:comment.title, user: user._id, typeTransaction: type._id, timestamp: comment.created, timestampString: utils.formatDate(comment.created), requestType: 0});
     pointsDetail = await pointsDetail.save();
     // Update user acccount's points
@@ -905,7 +919,7 @@ function findSteemplusPrice(date){
       let priceJSON = JSON.parse(prices[0].memo).priceHistory;
       if(priceJSON === undefined) return {price: 1, totalSteem: 196552616.386, totalVests: 397056980101.127362};
       else
-        return {price: (priceJSON.priceSteem / priceJSON.priceSBD), totalSteem: (priceJSON.totalSteem === null ? 196552616.386 : priceJSON.totalSteem), totalVests: (priceJSON.totalVests === null ? 397056980101.127362 : priceJSON.totalVests)};
+        return {price: (priceJSON.priceSteem / priceJSON.priceSBD), totalSteem: (priceJSON.totalSteem === undefined ? 196552616.386 : priceJSON.totalSteem), totalVests: (priceJSON.totalVests === undefined ? 397056980101.127362 : priceJSON.totalVests)};
     }
   }
 }
