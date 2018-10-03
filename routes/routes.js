@@ -649,7 +649,7 @@ async function votingRoutine(spAccount, postsBeforeProcess)
             }
           });
         }
-      },0.25*1000*nbPostsSent); // Can't comment more than once every 20 second so we decided to use 30sec in case blockchain is slow
+      },30*1000*nbPostsSent); // Can't comment more than once every 20 second so we decided to use 30sec in case blockchain is slow
     })(nbPostsSent+1);
   }
   
