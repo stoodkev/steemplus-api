@@ -537,11 +537,25 @@ var appRouter = function (app) {
 // Function used to process the voting routine
 // @parameter spAccount : SteemPlus account
 // @parameter posts : posts that have to be voted for
-async function votingRoutine(spAccount, posts)
+async function votingRoutine(spAccount, postsBeforeProcess)
 {
-  if(posts.length === 0){
+  if(postsBeforeProcess.length === 0){
     console.log('No new post to vote! End!');
     return;
+  }
+  var posts = [];
+  for(let i = 0; i < postsBeforeProcess.length; i++){
+    let votesList = await steem.api.getActiveVotesAsync(postsBeforeProcess[i].author, postsBeforeProcess[i].permlink);
+    var alreadyVoted = false;
+    for(let vote of votesList){
+      if(vote.voter === votingAccount && vote.weight !== 0)
+      {
+        console.log(postsBeforeProcess[i]);
+        alreadyVoted = true;
+        break;
+      }
+    }
+    if(!alreadyVoted) posts.push(postsBeforeProcess[i]);
   }
 
   let totalSPP = 0;
@@ -634,19 +648,6 @@ async function votingRoutine(spAccount, posts)
               });
             }
           });
-          if(indexPost === posts.length)
-          {
-            console.log('Saving last date...');
-            posts.sort(function(a, b){return new Date(b.created)-new Date(a.created)});
-            LastVote.findOne({}, function(err, lastVote){
-              if(lastVote === null)
-                var lastVote = new LastVote({date: utils.formatDate(posts[0].created)});
-              else
-                lastVote.date = utils.formatDate(posts[0].created);
-              lastVote.save();
-              console.log('Last date saved...');
-            });
-          }
         }
       },0.25*1000*nbPostsSent); // Can't comment more than once every 20 second so we decided to use 30sec in case blockchain is slow
     })(nbPostsSent+1);
