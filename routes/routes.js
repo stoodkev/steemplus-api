@@ -574,7 +574,6 @@ async function votingRoutine(spAccount, posts)
   console.log(`Will try to vote for ${posts.length} post(s)`);
   for(let post of posts)
   {
-    console.log(post);
     nbPostsSent++;
     (function(indexPost)
     {
@@ -584,11 +583,24 @@ async function votingRoutine(spAccount, posts)
         if(post.percentage === 0)
         {
           console.log(`Vote too low : Not voting for ${post.permlink} written by ${post.author}`);
+          if(indexPost === posts.length)
+          {
+            console.log('Saving last date...');
+            posts.sort(function(a, b){return new Date(b.created)-new Date(a.created)});
+            LastVote.findOne({}, function(err, lastVote){
+              if(lastVote === null)
+                var lastVote = new LastVote({date: utils.formatDate(posts[0].created)});
+              else
+                lastVote.date = utils.formatDate(posts[0].created);
+              lastVote.save();
+              console.log('Last date saved...');
+            });
+          }
         }
         else
         {
           console.log(`Trying to vote for ${post.permlink} written by ${post.author}, value : ${post.percentage}`);
-          steem.broadcast.vote(config.wif_test, votingAccount, post.author, post.permlink, post.percentage, function(err, result) {
+          steem.broadcast.vote(config.wif, votingAccount, post.author, post.permlink, post.percentage, function(err, result) {
             if(err)
             {
               let errorString = err.toString();
@@ -602,23 +614,44 @@ async function votingRoutine(spAccount, posts)
               console.log(`Trying to comment for ${post.permlink} written by ${post.author}`);
               steem.broadcast.comment(config.wif, post.author, post.permlink, votingAccount, post.permlink+"---vote-steemplus", "SteemPlus upvote", utils.commentVotingBot(post), {}, function(err, result) {
                 if(err) console.log(err);
-                else console.log(`Succeed commenting for ${post.permlink} written by ${post.author}`);
+                else {
+                  console.log(`Succeed commenting for ${post.permlink} written by ${post.author}`);
+                  if(indexPost === posts.length)
+                  {
+                    console.log('Saving last date...');
+                    posts.sort(function(a, b){return new Date(b.created)-new Date(a.created)});
+                    LastVote.findOne({}, function(err, lastVote){
+                      if(lastVote === null)
+                        var lastVote = new LastVote({date: utils.formatDate(posts[0].created)});
+                      else
+                        lastVote.date = utils.formatDate(posts[0].created);
+
+                      lastVote.save();
+                      console.log('Last date saved...');
+                    });
+                  }
+                }
               });
             }
           });
+          if(indexPost === posts.length)
+          {
+            console.log('Saving last date...');
+            posts.sort(function(a, b){return new Date(b.created)-new Date(a.created)});
+            LastVote.findOne({}, function(err, lastVote){
+              if(lastVote === null)
+                var lastVote = new LastVote({date: utils.formatDate(posts[0].created)});
+              else
+                lastVote.date = utils.formatDate(posts[0].created);
+              lastVote.save();
+              console.log('Last date saved...');
+            });
+          }
         }
-      },30*1000*nbPostsSent); // Can't comment more than once every 20 second so we decided to use 30sec in case blockchain is slow
+      },0.25*1000*nbPostsSent); // Can't comment more than once every 20 second so we decided to use 30sec in case blockchain is slow
     })(nbPostsSent+1);
   }
-  posts.sort(function(a, b){return new Date(b.created)-new Date(a.created)});
-  LastVote.findOne({}, function(err, lastVote){
-    if(lastVote === null)
-      var lastVote = new LastVote({date: utils.formatDate(posts[0].created)});
-    else
-      lastVote.date = utils.formatDate(posts[0].created);
-
-    lastVote.save();
-  });
+  
 }
 
 // Function used to recalculate the percentages if there is at least one > 100
