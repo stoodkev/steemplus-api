@@ -10,11 +10,13 @@ var LastVote = require('../models/lastVote');
 var totalVests = null;
 var totalSteem = null;
 var ratioSBDSteem = null;
-var votingAccount = 'steem-plus';
+var votingAccount = 'cedricguillas';
 var currentRatioSBDSteem = null;
 var currentTotalSteem = null;
 var currentTotalVests = null;
 var steemPricesHistory = null;
+
+const MAX_VOTING_PERCENTAGE = 10500;
 
 var lastPermlink=null;
 var appRouter = function (app) {
@@ -550,7 +552,7 @@ async function votingRoutine(spAccount, postsBeforeProcess)
     for(let vote of votesList){
       if(vote.voter === votingAccount && vote.weight !== 0)
       {
-        console.log(postsBeforeProcess[i]);
+        console.log('Already voted : ', postsBeforeProcess[i]);
         alreadyVoted = true;
         break;
       }
@@ -569,7 +571,7 @@ async function votingRoutine(spAccount, postsBeforeProcess)
   let totalPercentage = 0;
   for(let post of posts)
   {
-    let percentage = Math.floor(post.nbPoints/totalSPP*100000);
+    let percentage = Math.floor(post.nbPoints/totalSPP*MAX_VOTING_PERCENTAGE*10);
     post.percentage = percentage;
     totalPercentage += percentage;
   }
@@ -586,6 +588,7 @@ async function votingRoutine(spAccount, postsBeforeProcess)
   var nbPostsSent = -1;
   // Start voting
   console.log(`Will try to vote for ${posts.length} post(s)`);
+
   for(let post of posts)
   {
     nbPostsSent++;
@@ -665,11 +668,11 @@ function updatePercentages(posts)
   let totalSPPnew = 0.00;
   for(let post of posts)
   {
-    if(post.percentage >= 10000)
+    if(post.percentage >= MAX_VOTING_PERCENTAGE)
     {
       // If percentage > 100 we put it back to 100.00 and add the difference with 100 to additionnalPercentage
-      additionnalPercentage += (post.percentage - 10000);
-      post.percentage = 10000;
+      additionnalPercentage += (post.percentage - MAX_VOTING_PERCENTAGE);
+      post.percentage = MAX_VOTING_PERCENTAGE;
     }
     else
       totalSPPnew += post.nbPoints; // If not, counts the 'new Points'
@@ -679,11 +682,11 @@ function updatePercentages(posts)
   let totalNewPercentage = 0.00;
   for(let post of posts)
   {
-    let percentage = 10000;
-    if(post.percentage !== 10000)
+    let percentage = MAX_VOTING_PERCENTAGE;
+    if(post.percentage !== MAX_VOTING_PERCENTAGE)
     {
       // For each post that has a percentage different than 100.00, add some more percentage.
-      let percentage = Math.floor(post.nbPoints/totalSPPnew*additionnalPercentage);
+      percentage = Math.floor(post.nbPoints/totalSPPnew*additionnalPercentage);
       post.percentage = Math.floor(post.percentage+percentage);
     }
     totalNewPercentage += percentage;
@@ -696,7 +699,7 @@ function hasUncorrectPercent(posts)
 {
   for(let post of posts)
   {
-    if(post.percentage > 10000) return true;
+    if(post.percentage > MAX_VOTING_PERCENTAGE) return true;
   }
   return false;
 }
