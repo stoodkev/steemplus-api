@@ -10,13 +10,13 @@ var LastVote = require('../models/lastVote');
 var totalVests = null;
 var totalSteem = null;
 var ratioSBDSteem = null;
-var votingAccount = 'cedricguillas';
+var votingAccount = 'steem-plus';
 var currentRatioSBDSteem = null;
 var currentTotalSteem = null;
 var currentTotalVests = null;
 var steemPricesHistory = null;
 
-const MAX_VOTING_PERCENTAGE = 10500;
+const MAX_VOTING_PERCENTAGE = 11000;
 
 var lastPermlink=null;
 var appRouter = function (app) {
@@ -589,18 +589,27 @@ async function votingRoutine(spAccount, postsBeforeProcess)
   // Start voting
   console.log(`Will try to vote for ${posts.length} post(s)`);
 
-  for(let post of posts)
+  // Delete post with percent equals 0
+  let postsToVote = posts.filter(p => p.percentage > 0);
+
+  var vm = 1;
+  for(let post of postsToVote){
+    vm = vm - (vm * 0.02 * post.percentage/10000.00);
+  }
+  console.log('Theorical mana after vote : ' + vm);
+
+  for(let post of postsToVote)
   {
     nbPostsSent++;
     (function(indexPost)
     {
       setTimeout(function()
       {
-        console.log(`Post #${indexPost}/${posts.length}`);
+        console.log(`Post #${indexPost}/${postsToVote.length}`);
         if(post.percentage === 0)
         {
           console.log(`Vote too low : Not voting for ${post.permlink} written by ${post.author}`);
-          if(indexPost === posts.length)
+          if(indexPost === postsToVote.length)
           {
             console.log('Saving last date...');
             posts.sort(function(a, b){return new Date(b.created)-new Date(a.created)});
@@ -633,7 +642,7 @@ async function votingRoutine(spAccount, postsBeforeProcess)
                 if(err) console.log(err);
                 else {
                   console.log(`Succeed commenting for ${post.permlink} written by ${post.author}`);
-                  if(indexPost === posts.length)
+                  if(indexPost === postsToVote.length)
                   {
                     console.log('Saving last date...');
                     posts.sort(function(a, b){return new Date(b.created)-new Date(a.created)});
