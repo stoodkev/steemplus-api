@@ -16,7 +16,8 @@ var currentTotalSteem = null;
 var currentTotalVests = null;
 var steemPricesHistory = null;
 
-const MAX_VOTING_PERCENTAGE = 11000;
+const MAX_VOTING_PERCENTAGE = 10000;
+const MAX_PERCENTAGE = 11000;
 
 var lastPermlink=null;
 var appRouter = function (app) {
@@ -583,7 +584,7 @@ async function votingRoutine(spAccount, postsBeforeProcess)
   let totalPercentage = 0;
   for(let post of posts)
   {
-    let percentage = Math.floor(post.nbPoints/totalSPP*MAX_VOTING_PERCENTAGE*10);
+    let percentage = Math.floor(post.nbPoints/totalSPP*MAX_PERCENTAGE*10);
     post.percentage = percentage;
     totalPercentage += percentage;
   }
@@ -606,6 +607,7 @@ async function votingRoutine(spAccount, postsBeforeProcess)
 
   var vm = 1;
   for(let post of postsToVote){
+    console.log(post);
     vm = vm - (vm * 0.02 * post.percentage/10000.00);
   }
   console.log('Theorical mana after vote : ' + vm);
@@ -766,6 +768,7 @@ function updateSteemplusPointsTransfers(transfers)
           continue;
         }
         type = await TypeTransaction.findOne({name: 'MinnowBooster'});
+        var isReimbursement = false;
         for(const reimbursement of reimbursementList)
         {
           if(transfer.from === reimbursement.to)
@@ -778,6 +781,8 @@ function updateSteemplusPointsTransfers(transfers)
                   amount = (transfer.amount - reimbursement.amount).toFixed(2) * 0.01;
                   permlink = transfer.memo.replace('steemplus ', '');
                   accountName = transfer.from;
+                  isReimbursement = true;
+                  break;
                 }
                 else {
                   reason = reimbursement.memo;
@@ -791,6 +796,8 @@ function updateSteemplusPointsTransfers(transfers)
                 permlink = transfer.memo.replace('steemplus ', '');
                 amount = (transfer.amount - reimbursement.amount).toFixed(2) * 0.01;
                 accountName = transfer.from;
+                isReimbursement = true;
+                break;
               }
               else {
                 reason = reimbursement.memo;
@@ -799,7 +806,14 @@ function updateSteemplusPointsTransfers(transfers)
             }
           }
         }
+        if(!isReimbursement)
+        {
+          permlink = transfer.memo.replace('steemplus ', '');
+          amount = transfer.amount.toFixed(2) * 0.01;
+          accountName = transfer.from;
+        }
         requestType = 2;
+        
       }
       else if(transfer.from === 'postpromoter' && transfer.to === 'steemplus-pay')
       {
@@ -825,7 +839,6 @@ function updateSteemplusPointsTransfers(transfers)
       if(type === null)
       {
         console.log('refused type');
-        console.log(transfer);
         continue;
       }
       if(reason !== null)
@@ -839,6 +852,9 @@ function updateSteemplusPointsTransfers(transfers)
       if(user === null)
       {
         // If not, create it
+        if(accountName === "" || accountName === undefined || accountName === null) {
+          continue;
+        }
         user = new User({accountName: accountName, nbPoints: 0});
         user = await user.save();
       }
