@@ -16,6 +16,8 @@ var currentTotalSteem = null;
 var currentTotalVests = null;
 var steemPricesHistory = null;
 
+const MAX_VOTING_PERCENTAGE = 11000;
+
 var lastPermlink=null;
 var appRouter = function (app) {
 
@@ -360,7 +362,7 @@ var appRouter = function (app) {
         currentRatioSBDSteem = values[2] / values[1];
         storeSteemPriceInBlockchain(values[2], values[1], currentTotalSteem, currentTotalVests);
 
-        // get price history
+        //get price history
         await new sql.ConnectionPool(config.config_api).connect().then(pool => {
           return pool.request()
           .query(`
@@ -436,17 +438,27 @@ var appRouter = function (app) {
             FROM TxTransfers
             WHERE
             (
-                ([from] = 'minnowbooster' and memo LIKE '%memo:%' and timestamp > CONVERT(datetime, '${lastEntryDateMB}'))
+              timestamp > CONVERT(datetime, '${lastEntryDate}')
+              AND
+              (
+                  ([to] = 'steemplus-pay' AND [from] != 'steemplus-pay' AND [from] != 'minnowbooster')
+              )
+            )
+            OR
+            (
+              timestamp > CONVERT(datetime, '${lastEntryDateMB}')
+              AND
+              (
+                ([from] = 'minnowbooster' AND memo LIKE '%memo:%')
               OR
-                ([from] = 'minnowbooster' and memo LIKE '%permlink:%' and timestamp > CONVERT(datetime, '${lastEntryDateMB}'))
+                ([from] = 'minnowbooster' AND memo LIKE '%permlink:%')
               OR
-                ([from] = 'minnowbooster' and memo LIKE '%Post:%' and timestamp > CONVERT(datetime, '${lastEntryDateMB}'))
+                ([from] = 'minnowbooster' AND memo LIKE '%Post:%')
               OR
-                ([to] = 'minnowbooster' and memo LIKE 'steemplus%' AND timestamp < DATEADD(second, -${delaySteemSQL+10*60}, GETUTCDATE()) AND timestamp > CONVERT(datetime, '${lastEntryDateMB}'))
-              OR
-                ([to] = 'steemplus-pay' AND [from] != 'steemplus-pay' AND [from] != 'minnowbooster' AND timestamp > CONVERT(datetime, '${lastEntryDate}'))
+                ([to] = 'minnowbooster' AND memo LIKE 'steemplus%' AND timestamp < DATEADD(second, -${delaySteemSQL+10*60}, GETUTCDATE()))
+              )
             );
-            `)})
+          `)})
           .then(result => {
             var transfers = result.recordsets[0];
             updateSteemplusPointsTransfers(transfers);
@@ -472,8 +484,9 @@ var appRouter = function (app) {
       {
         let spAccount = result[0];
         // Only start voting if the voting power is full
-        if(utils.getVotingPowerPerAccount(spAccount) > 99.87 && process.env.CAN_VOTE === 'true')
+        if((utils.getVotingPowerPerAccount(spAccount) > 99.87 || process.env.FORCE_VOTE === 'true') && process.env.CAN_VOTE === 'true')
         {
+          console.log('start voting...');
           // Find all the accounts names that has more than 0 points
           User.find({nbPoints: {$gt: 0}}, 'accountName', function(err, users){
             if(err) console.log(`Error while getting users : ${err}`);
@@ -536,11 +549,25 @@ var appRouter = function (app) {
 // Function used to process the voting routine
 // @parameter spAccount : SteemPlus account
 // @parameter posts : posts that have to be voted for
-async function votingRoutine(spAccount, posts)
+async function votingRoutine(spAccount, postsBeforeProcess)
 {
-  if(posts.length === 0){
+  if(postsBeforeProcess.length === 0){
     console.log('No new post to vote! End!');
     return;
+  }
+  var posts = [];
+  for(let i = 0; i < postsBeforeProcess.length; i++){
+    let votesList = await steem.api.getActiveVotesAsync(postsBeforeProcess[i].author, postsBeforeProcess[i].permlink);
+    var alreadyVoted = false;
+    for(let vote of votesList){
+      if(vote.voter === votingAccount && vote.weight !== 0)
+      {
+        console.log('Already voted : ', postsBeforeProcess[i]);
+        alreadyVoted = true;
+        break;
+      }
+    }
+    if(!alreadyVoted) posts.push(postsBeforeProcess[i]);
   }
 
   let totalSPP = 0;
@@ -554,7 +581,7 @@ async function votingRoutine(spAccount, posts)
   let totalPercentage = 0;
   for(let post of posts)
   {
-    let percentage = Math.floor(post.nbPoints/totalSPP*100000);
+    let percentage = Math.floor(post.nbPoints/totalSPP*MAX_VOTING_PERCENTAGE*10);
     post.percentage = percentage;
     totalPercentage += percentage;
   }
@@ -571,18 +598,40 @@ async function votingRoutine(spAccount, posts)
   var nbPostsSent = -1;
   // Start voting
   console.log(`Will try to vote for ${posts.length} post(s)`);
-  for(let post of posts)
+
+  // Delete post with percent equals 0
+  let postsToVote = posts.filter(p => p.percentage > 0);
+
+  var vm = 1;
+  for(let post of postsToVote){
+    vm = vm - (vm * 0.02 * post.percentage/10000.00);
+  }
+  console.log('Theorical mana after vote : ' + vm);
+
+  for(let post of postsToVote)
   {
-    console.log(post);
     nbPostsSent++;
     (function(indexPost)
     {
       setTimeout(function()
       {
-        console.log(`Post #${indexPost}/${posts.length}`);
+        console.log(`Post #${indexPost}/${postsToVote.length}`);
         if(post.percentage === 0)
         {
           console.log(`Vote too low : Not voting for ${post.permlink} written by ${post.author}`);
+          if(indexPost === postsToVote.length)
+          {
+            console.log('Saving last date...');
+            posts.sort(function(a, b){return new Date(b.created)-new Date(a.created)});
+            LastVote.findOne({}, function(err, lastVote){
+              if(lastVote === null)
+                var lastVote = new LastVote({date: utils.formatDate(posts[0].created)});
+              else
+                lastVote.date = utils.formatDate(posts[0].created);
+              lastVote.save();
+              console.log('Last date saved...');
+            });
+          }
         }
         else
         {
@@ -601,7 +650,23 @@ async function votingRoutine(spAccount, posts)
               console.log(`Trying to comment for ${post.permlink} written by ${post.author}`);
               steem.broadcast.comment(config.wif, post.author, post.permlink, votingAccount, post.permlink+"---vote-steemplus", "SteemPlus upvote", utils.commentVotingBot(post), {}, function(err, result) {
                 if(err) console.log(err);
-                else console.log(`Succeed commenting for ${post.permlink} written by ${post.author}`);
+                else {
+                  console.log(`Succeed commenting for ${post.permlink} written by ${post.author}`);
+                  if(indexPost === postsToVote.length)
+                  {
+                    console.log('Saving last date...');
+                    posts.sort(function(a, b){return new Date(b.created)-new Date(a.created)});
+                    LastVote.findOne({}, function(err, lastVote){
+                      if(lastVote === null)
+                        var lastVote = new LastVote({date: utils.formatDate(posts[0].created)});
+                      else
+                        lastVote.date = utils.formatDate(posts[0].created);
+
+                      lastVote.save();
+                      console.log('Last date saved...');
+                    });
+                  }
+                }
               });
             }
           });
@@ -609,15 +674,7 @@ async function votingRoutine(spAccount, posts)
       },30*1000*nbPostsSent); // Can't comment more than once every 20 second so we decided to use 30sec in case blockchain is slow
     })(nbPostsSent+1);
   }
-  posts.sort(function(a, b){return new Date(b.created)-new Date(a.created)});
-  LastVote.findOne({}, function(err, lastVote){
-    if(lastVote === null)
-      var lastVote = new LastVote({date: utils.formatDate(posts[0].created)});
-    else
-      lastVote.date = utils.formatDate(posts[0].created);
-
-    lastVote.save();
-  });
+  
 }
 
 // Function used to recalculate the percentages if there is at least one > 100
@@ -630,11 +687,11 @@ function updatePercentages(posts)
   let totalSPPnew = 0.00;
   for(let post of posts)
   {
-    if(post.percentage >= 10000)
+    if(post.percentage >= MAX_VOTING_PERCENTAGE)
     {
       // If percentage > 100 we put it back to 100.00 and add the difference with 100 to additionnalPercentage
-      additionnalPercentage += (post.percentage - 10000);
-      post.percentage = 10000;
+      additionnalPercentage += (post.percentage - MAX_VOTING_PERCENTAGE);
+      post.percentage = MAX_VOTING_PERCENTAGE;
     }
     else
       totalSPPnew += post.nbPoints; // If not, counts the 'new Points'
@@ -644,11 +701,11 @@ function updatePercentages(posts)
   let totalNewPercentage = 0.00;
   for(let post of posts)
   {
-    let percentage = 10000;
-    if(post.percentage !== 10000)
+    let percentage = MAX_VOTING_PERCENTAGE;
+    if(post.percentage !== MAX_VOTING_PERCENTAGE)
     {
       // For each post that has a percentage different than 100.00, add some more percentage.
-      let percentage = Math.floor(post.nbPoints/totalSPPnew*additionnalPercentage);
+      percentage = Math.floor(post.nbPoints/totalSPPnew*additionnalPercentage);
       post.percentage = Math.floor(post.percentage+percentage);
     }
     totalNewPercentage += percentage;
@@ -661,56 +718,76 @@ function hasUncorrectPercent(posts)
 {
   for(let post of posts)
   {
-    if(post.percentage > 10000) return true;
+    if(post.percentage > MAX_VOTING_PERCENTAGE) return true;
   }
   return false;
 }
 
 // Function used to process the data from SteemSQL for requestType == 1
 // @parameter transfers : transfers data received from SteemSQL
-async function updateSteemplusPointsTransfers(transfers)
+function updateSteemplusPointsTransfers(transfers)
 {
   // Number of new entry in the DB
   var nbPointDetailsAdded = 0;
-  var nbMinnowAccepted = 0;
-  var nbMinnowRejected = 0;
-  var nbPostProAccepted = 0;
-  var nbPostProRejected = 0;
   let reimbursementList = transfers.filter(transfer => transfer.from === 'minnowbooster');
   let transfersList = transfers.filter(transfer => transfer.from !== 'minnowbooster');
+  let steemMonstersRequestIDs = transfers.filter(transfer => transfer.to === 'steemplus-pay' && transfer.from === 'steemmonsters');
+  steemMonstersRequestIDs = steemMonstersRequestIDs.map(x => x.memo.replace('Affiliate payment for Steem Monsters purchase: ', ''));
+  let promises = [];
+  for(let requestId of steemMonstersRequestIDs){
+    promises.push(getPurchaseInfoSM(requestId));
+  }
 
-  console.log(`Adding ${transfersList.length} new transfer(s) to DB`);
-  // Iterate on transfers
-  for (const transfer of transfersList) {
-    var reason = null;
-    // Init default values
+  Promise.all(promises).then(async function(values){
+    let steemMonstersRequestUser = {};
+    for(let i = 0; i < values.length; i++){
+      steemMonstersRequestUser[values[i].requestId] = values[i].player;
+    }
+    console.log(`Adding ${transfersList.length} new transfer(s) to DB`);
+    // Iterate on transfers
+    for (const transfer of transfersList) {
+      var reason = null;
+      // Init default values
 
-    var permlink = '';
-    var accountName = null;
-    // Get the amount of the transfer
-    var amount = transfer.amount * 0.01; //Steemplus take 1% of the transaction
+      var permlink = '';
+      var accountName = null;
+      // Get the amount of the transfer
+      var amount = transfer.amount * 0.01; //Steemplus take 1% of the transaction
 
-    var requestType = null;
+      var requestType = null;
 
-    // Get type
-    var type = null;
-    if(transfer.to === 'minnowbooster'){
-      if(transfer.memo.toLowerCase().replace('steemplus') === '')
-      {
-        continue;
-      }
-      type = await TypeTransaction.findOne({name: 'MinnowBooster'});
-      for(const reimbursement of reimbursementList)
-      {
-        if(transfer.from === reimbursement.to)
+      // Get type
+      var type = null;
+      if(transfer.to === 'minnowbooster'){
+        if(transfer.memo.toLowerCase().replace('steemplus') === '')
         {
-          if(transfer.memo.replace('steemplus https://steemit.com/', '').split('/')[2] === undefined)
+          continue;
+        }
+        type = await TypeTransaction.findOne({name: 'MinnowBooster'});
+        for(const reimbursement of reimbursementList)
+        {
+          if(transfer.from === reimbursement.to)
           {
-            if(reimbursement.memo.includes(transfer.memo.replace('steemplus ', '')))
+            if(transfer.memo.replace('steemplus https://steemit.com/', '').split('/')[2] === undefined)
+            {
+              if(reimbursement.memo.includes(transfer.memo.replace('steemplus ', '')))
+              {
+                if(reimbursement.memo.includes('You got an upgoat')){
+                  amount = (transfer.amount - reimbursement.amount).toFixed(2) * 0.01;
+                  permlink = transfer.memo.replace('steemplus ', '');
+                  accountName = transfer.from;
+                }
+                else {
+                  reason = reimbursement.memo;
+                  break;
+                }
+              }
+            }
+            else if(reimbursement.memo.includes(transfer.memo.replace('steemplus https://steemit.com/', '').split('/')[2]))
             {
               if(reimbursement.memo.includes('You got an upgoat')){
-                amount = (transfer.amount - reimbursement.amount).toFixed(2) * 0.01;
                 permlink = transfer.memo.replace('steemplus ', '');
+                amount = (transfer.amount - reimbursement.amount).toFixed(2) * 0.01;
                 accountName = transfer.from;
               }
               else {
@@ -719,76 +796,74 @@ async function updateSteemplusPointsTransfers(transfers)
               }
             }
           }
-          else if(reimbursement.memo.includes(transfer.memo.replace('steemplus https://steemit.com/', '').split('/')[2]))
-          {
-            if(reimbursement.memo.includes('You got an upgoat')){
-              permlink = transfer.memo.replace('steemplus ', '');
-              amount = (transfer.amount - reimbursement.amount).toFixed(2) * 0.01;
-              accountName = transfer.from;
-            }
-            else {
-              reason = reimbursement.memo;
-              break;
-            }
-          }
         }
+        requestType = 2;
       }
-      requestType = 2;
-    }
-    else if(transfer.from === 'postpromoter' && transfer.to === 'steemplus-pay')
-    {
-      type = await TypeTransaction.findOne({name: 'PostPromoter'});
-      if(transfer.memo.match(/Sender: @([a-zA-Z0-9\.-]*),/i) === null)
+      else if(transfer.from === 'postpromoter' && transfer.to === 'steemplus-pay')
       {
+        type = await TypeTransaction.findOne({name: 'PostPromoter'});
+        if(transfer.memo.match(/Sender: @([a-zA-Z0-9\.-]*),/i) === null)
+        {
+          continue;
+        }
+        accountName = transfer.memo.match(/Sender: @([a-zA-Z0-9\.-]*),/i)[1];
+        permlink = transfer.memo.match(/Post: (.*)/)[1];
+        amount = transfer.amount; // 1% already counted
+        requestType = 1;
+      }
+      else if(transfer.to === 'steemplus-pay' && transfer.from === 'steemmonsters')
+      {
+        type = await TypeTransaction.findOne({name: 'SteemMonsters'});
+        accountName = steemMonstersRequestUser[transfer.memo.replace('Affiliate payment for Steem Monsters purchase: ', '')];
+        amount = transfer.amount;
+        requestType = 1;
+        permlink = '';
+      }
+
+      if(type === null)
+      {
+        console.log('refused type');
+        console.log(transfer);
         continue;
       }
-      accountName = transfer.memo.match(/Sender: @([a-zA-Z0-9\.-]*),/i)[1];
-      permlink = transfer.memo.match(/Post: (.*)/)[1];
-      amount = transfer.amount; // 1% already counted
-      requestType = 1;
-    }
+      if(reason !== null)
+      {
+        console.log('refused reason : ' + reason);
+        continue;
+      }
+      // Check if user is already in DB
 
-    if(type === null)
-    {
-      console.log('refused type');
-      continue;
-    }
-    if(reason !== null)
-    {
-      console.log('refused reason : ' + reason);
-      continue;
-    }
-    // Check if user is already in DB
+      var user = await User.findOne({accountName: accountName});
+      if(user === null)
+      {
+        // If not, create it
+        user = new User({accountName: accountName, nbPoints: 0});
+        user = await user.save();
+      }
 
-    var user = await User.findOne({accountName: accountName});
-    if(user === null)
-    {
-      // If not, create it
-      user = new User({accountName: accountName, nbPoints: 0});
-      user = await user.save();
+      var ratioSBDSteem = findSteemplusPrice(transfer.timestamp).price;
+      // We decided that 1SPP == 0.01 SBD
+      var nbPoints = 0;
+      if(transfer.amount_symbol === "SBD")
+        nbPoints = amount * 100;
+      else if(transfer.amount_symbol === "STEEM")
+      {
+        nbPoints = amount * ratioSBDSteem * 100;
+      }
+      // Create new PointsDetail entry
+      var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: transfer.amount_symbol, permlink: permlink, user: user._id, typeTransaction: type._id, timestamp: transfer.timestamp, timestampString: utils.formatDate(transfer.timestamp), requestType: requestType});
+      pointsDetail = await pointsDetail.save();
+
+      // Update user account
+      user.pointsDetails.push(pointsDetail);
+      user.nbPoints = user.nbPoints + nbPoints;
+      await user.save();
+      nbPointDetailsAdded++;
     }
-
-    var ratioSBDSteem = findSteemplusPrice(transfer.timestamp).price;
-    // We decided that 1SPP == 0.01 SBD
-    var nbPoints = 0;
-    if(transfer.amount_symbol === "SBD")
-      nbPoints = amount * 100;
-    else if(transfer.amount_symbol === "STEEM")
-    {
-
-      nbPoints = amount * ratioSBDSteem * 100;
-    }
-    // Create new PointsDetail entry
-    var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: amount, amountSymbol: transfer.amount_symbol, permlink: permlink, user: user._id, typeTransaction: type._id, timestamp: transfer.timestamp, timestampString: utils.formatDate(transfer.timestamp), requestType: requestType});
-    pointsDetail = await pointsDetail.save();
-
-    // Update user account
-    user.pointsDetails.push(pointsDetail);
-    user.nbPoints = user.nbPoints + nbPoints;
-    await user.save();
-    nbPointDetailsAdded++;
-  }
-  console.log(`Added ${nbPointDetailsAdded} pointDetail(s)`);
+    console.log(`Added ${nbPointDetailsAdded} pointDetail(s)`);
+  });
+  
+  
 }
 
 // Function used to process the data from SteemSQL for requestType == 0
@@ -846,6 +921,16 @@ async function updateSteemplusPointsComments(comments)
     nbPointDetailsAdded++;
   }
   console.log(`Added ${nbPointDetailsAdded} pointDetail(s)`);
+}
+
+function getPurchaseInfoSM(requestId){
+  return new Promise(function(resolve, reject) {
+    getJSON('https://steemmonsters.com/purchases/status?id='+ requestId, function(err, response){
+      if(err === null){
+        resolve({player: response.player, requestId: response.uid});
+      }
+    });
+  });
 }
 
 // Function used to get Steem Price

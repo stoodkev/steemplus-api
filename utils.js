@@ -16,18 +16,20 @@ exports.formatDate = function(string) {
 };
 
 exports.commentVotingBot = function(post) {
-  return (commentBody = `
-	<div>
-		<p>Hi, ${post.author}!</p>
-		<p>You just got a <b>${post.percentage}%</b> upvote from SteemPlus!</p>
-		<p>To get higher upvotes, earn more SteemPlus Points (SPP). On your Steemit wallet, check your SPP balance and click on "How to earn SPP?" to find out all the ways to earn.</p>
-    <p>If you're not using SteemPlus yet, please check our last posts in <a href="https://steemit.com/@steem-plus">here</a> to see the many ways in which SteemPlus can improve your Steem experience on Steemit and Busy.</p>
-	</div>`);
+  let commentBody = `Hi, @${post.author}!\n\n`;
+  commentBody += `You just got a **${post.percentage/100.00}%** upvote from SteemPlus!\n`;
+  commentBody += `To get higher upvotes, earn more SteemPlus Points (SPP). On your Steemit wallet, check your SPP balance and click on "How to earn SPP?" to find out all the ways to earn.\n`;
+  commentBody += `If you're not using SteemPlus yet, please check our last posts in [here](https://steemit.com/@steem-plus) to see the many ways in which SteemPlus can improve your Steem experience on Steemit and Busy.\n`;
+  return commentBody;
 }
 
 exports.commentVotingBotTest=function(post)
 {
-	return commentBody = 'Test';
+	let commentBody = `Hi, @${post.author}!\n\n`;
+  commentBody += `You just got a **${post.percentage/100.00}%** upvote from SteemPlus!\n`;
+  commentBody += `To get higher upvotes, earn more SteemPlus Points (SPP). On your Steemit wallet, check your SPP balance and click on "How to earn SPP?" to find out all the ways to earn.\n`;
+  commentBody += `If you're not using SteemPlus yet, please check our last posts in [here](https://steemit.com/@steem-plus) to see the many ways in which SteemPlus can improve your Steem experience on Steemit and Busy.\n`;
+  return commentBody;
 }
 
 exports.getVotingPowerPerAccount = function(account) {
