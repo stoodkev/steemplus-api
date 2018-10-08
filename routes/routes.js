@@ -16,7 +16,8 @@ var currentTotalSteem = null;
 var currentTotalVests = null;
 var steemPricesHistory = null;
 
-const MAX_VOTING_PERCENTAGE = 11000;
+const MAX_VOTING_PERCENTAGE = 10000;
+const MAX_PERCENTAGE = 11000;
 
 var lastPermlink=null;
 var appRouter = function (app) {
@@ -242,20 +243,22 @@ var appRouter = function (app) {
     new sql.ConnectionPool(config.config_api).connect().then(pool => {
       return pool.request()
       .input("username",req.params.username)
-      .query("SELECT * \
-              FROM ( SELECT timestamp, author, permlink, -1 as max_accepted_payout, -1 as percent_steem_dollars, -1 as pending_payout_value, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, '' as beneficiaries, type='paid_curation' FROM VOCurationRewards WHERE curator=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < GETUTCDATE() \
-                UNION ALL \
-                SELECT timestamp, author, permlink, -1 as max_accepted_payout, -1 as percent_steem_dollars, -1 as pending_payout_value, -1 as reward, sbd_payout, steem_payout, vesting_payout, '' as beneficiaries, type='paid_author' FROM VOAuthorRewards WHERE author=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < GETUTCDATE()  \
-                UNION ALL \
-                SELECT timestamp, author, permlink, -1 as max_accepted_payout, -1 as percent_steem_dollars, -1 as pending_payout_value,TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, '' as beneficiaries, type='paid_benefactor' FROM VOCommentBenefactorRewards WHERE benefactor=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < GETUTCDATE() \
-                UNION ALL \
-                SELECT timestamp, author, permlink, -1 as max_accepted_payout, -1 as percent_steem_dollars, -1 as pending_payout_value,TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, '' as beneficiaries, type='pending_curation' FROM VOCurationRewards WHERE curator=@username AND timestamp >= DATEADD(day,0, GETUTCDATE()) \
-                UNION ALL \
-                select created, author, permlink, max_accepted_payout, percent_steem_dollars, pending_payout_value,  -1 as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vesting_payout, beneficiaries, 'pending_author' from Comments WHERE author = @username and pending_payout_value > 0 AND created >= DATEADD(day, -7, GETUTCDATE())   \
-                UNION ALL \
-                SELECT timestamp, author, permlink, -1 as max_accepted_payout, -1 as percent_steem_dollars, -1 as pending_payout_value,TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, '' as beneficiaries, type='pending_benefactor' FROM VOCommentBenefactorRewards WHERE benefactor=@username AND timestamp >= DATEADD(day,0, GETUTCDATE()) \
-              ) as rewards \
-              ORDER BY timestamp desc")})
+      .query(`
+        SELECT * 
+        FROM ( SELECT timestamp, author, permlink, -1 as max_accepted_payout, -1 as percent_steem_dollars, -1 as pending_payout_value, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, '' as beneficiaries, type='paid_curation' FROM VOCurationRewards WHERE curator=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < GETUTCDATE()
+          UNION ALL 
+          SELECT timestamp, author, permlink, -1 as max_accepted_payout, -1 as percent_steem_dollars, -1 as pending_payout_value, -1 as reward, sbd_payout, steem_payout, vesting_payout, '' as beneficiaries, type='paid_author' FROM VOAuthorRewards WHERE author=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < GETUTCDATE()
+          UNION ALL 
+          SELECT timestamp, author, permlink, -1 as max_accepted_payout, -1 as percent_steem_dollars, -1 as pending_payout_value, -1 as reward, sbd_payout, steem_payout, vesting_payout as vests_payout, '' as beneficiaries, type='paid_benefactor' FROM VOCommentBenefactorRewards WHERE benefactor=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < GETUTCDATE()
+          UNION ALL 
+          SELECT timestamp, author, permlink, -1 as max_accepted_payout, -1 as percent_steem_dollars, -1 as pending_payout_value,TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, '' as beneficiaries, type='pending_curation' FROM VOCurationRewards WHERE curator=@username AND timestamp >= DATEADD(day,0, GETUTCDATE()) 
+          UNION ALL 
+          select created, author, permlink, max_accepted_payout, percent_steem_dollars, pending_payout_value,  -1 as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vesting_payout, beneficiaries, 'pending_author' from Comments WHERE author = @username and pending_payout_value > 0 AND created >= DATEADD(day, -7, GETUTCDATE())   
+          UNION ALL 
+          SELECT timestamp, author, permlink, -1 as max_accepted_payout, -1 as percent_steem_dollars, -1 as pending_payout_value, -1 as reward, sbd_payout, steem_payout, vesting_payout as vests_payout, '' as beneficiaries, type='pending_benefactor' FROM VOCommentBenefactorRewards WHERE benefactor=@username AND timestamp >= DATEADD(day,0, GETUTCDATE()) 
+        ) as rewards 
+        ORDER BY timestamp;
+        `)})
       .then(result => {
       res.status(200).send(result.recordsets[0]);
       sql.close();
@@ -581,7 +584,7 @@ async function votingRoutine(spAccount, postsBeforeProcess)
   let totalPercentage = 0;
   for(let post of posts)
   {
-    let percentage = Math.floor(post.nbPoints/totalSPP*MAX_VOTING_PERCENTAGE*10);
+    let percentage = Math.floor(post.nbPoints/totalSPP*MAX_PERCENTAGE*10);
     post.percentage = percentage;
     totalPercentage += percentage;
   }
@@ -604,6 +607,7 @@ async function votingRoutine(spAccount, postsBeforeProcess)
 
   var vm = 1;
   for(let post of postsToVote){
+    console.log(post);
     vm = vm - (vm * 0.02 * post.percentage/10000.00);
   }
   console.log('Theorical mana after vote : ' + vm);
@@ -764,6 +768,7 @@ function updateSteemplusPointsTransfers(transfers)
           continue;
         }
         type = await TypeTransaction.findOne({name: 'MinnowBooster'});
+        var isReimbursement = false;
         for(const reimbursement of reimbursementList)
         {
           if(transfer.from === reimbursement.to)
@@ -776,6 +781,8 @@ function updateSteemplusPointsTransfers(transfers)
                   amount = (transfer.amount - reimbursement.amount).toFixed(2) * 0.01;
                   permlink = transfer.memo.replace('steemplus ', '');
                   accountName = transfer.from;
+                  isReimbursement = true;
+                  break;
                 }
                 else {
                   reason = reimbursement.memo;
@@ -789,6 +796,8 @@ function updateSteemplusPointsTransfers(transfers)
                 permlink = transfer.memo.replace('steemplus ', '');
                 amount = (transfer.amount - reimbursement.amount).toFixed(2) * 0.01;
                 accountName = transfer.from;
+                isReimbursement = true;
+                break;
               }
               else {
                 reason = reimbursement.memo;
@@ -797,7 +806,22 @@ function updateSteemplusPointsTransfers(transfers)
             }
           }
         }
+        if(!isReimbursement)
+        {
+          permlink = transfer.memo.replace('steemplus ', '');
+          amount = transfer.amount.toFixed(2) * 0.01;
+          accountName = transfer.from;
+        }
         requestType = 2;
+        
+      }
+      else if(transfer.to === 'steemplus-pay' && transfer.memo.includes('buySPP'))
+      {
+        type = await TypeTransaction.findOne({name: 'Purchase'});
+        accountName = transfer.from;
+        permlink = '';
+        amount = transfer.amount;
+        requestType = 1;
       }
       else if(transfer.from === 'postpromoter' && transfer.to === 'steemplus-pay')
       {
@@ -823,7 +847,6 @@ function updateSteemplusPointsTransfers(transfers)
       if(type === null)
       {
         console.log('refused type');
-        console.log(transfer);
         continue;
       }
       if(reason !== null)
@@ -837,6 +860,9 @@ function updateSteemplusPointsTransfers(transfers)
       if(user === null)
       {
         // If not, create it
+        if(accountName === "" || accountName === undefined || accountName === null) {
+          continue;
+        }
         user = new User({accountName: accountName, nbPoints: 0});
         user = await user.save();
       }
