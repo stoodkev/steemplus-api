@@ -815,6 +815,14 @@ function updateSteemplusPointsTransfers(transfers)
         requestType = 2;
         
       }
+      else if(transfer.to === 'steemplus-pay' && transfer.memo.includes('buySPP'))
+      {
+        type = await TypeTransaction.findOne({name: 'Purchase'});
+        accountName = transfer.from;
+        permlink = '';
+        amount = transfer.amount;
+        requestType = 1;
+      }
       else if(transfer.from === 'postpromoter' && transfer.to === 'steemplus-pay')
       {
         type = await TypeTransaction.findOne({name: 'PostPromoter'});
