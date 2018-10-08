@@ -64,3 +64,12 @@ exports.getEffectiveVestingSharesPerAccount = function(account) {
     parseFloat(account.delegated_vesting_shares.replace(" VESTS", ""));
   return effective_vesting_shares;
 };
+
+// generate a n characters random string
+exports.generateRandomString=function(size) {
+      var text = "";
+      var possible = "0123456789";
+      for (var i = 0; i < size; i++)
+        text += possible.charAt(Math.floor(Math.random() * possible.length));
+      return text;
+};
