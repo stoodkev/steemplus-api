@@ -343,6 +343,7 @@ var appRouter = function (app) {
     });
   });
 
+
   // This function is used to update steemplus point.
   // Function executed every hour.
   // Only get the results since the last entry.
@@ -1022,7 +1023,7 @@ async function updateSteemplusPointsComments(comments)
 
     // Get type
     var type = 'default';
-    if(comment.beneficiaries.includes('dtube.pay'))
+    if(comment.beneficiaries.includes('dtube.rewards'))
       type = await TypeTransaction.findOne({name: 'DTube'});
     else if(comment.beneficiaries.includes('utopian.pay'))
       type = await TypeTransaction.findOne({name: 'Utopian.io'});
