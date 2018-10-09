@@ -548,7 +548,112 @@ var appRouter = function (app) {
     });
   });
 
+  // Method used to give user rewards depending on delegations
+  app.get("/job/pay-delegations/:key", async function(req, res){
+    if(req.params.key !== config.key)
+    {
+      res.status(403).send("Permission denied");
+      return;
+    }
+
+    //get price history
+    await new sql.ConnectionPool(config.config_api).connect().then(pool => {
+      return pool.request()
+      .query(`
+        SELECT timestamp, memo
+        FROM TxTransfers
+        WHERE timestamp > '2018-08-03 12:05:42.000'
+        and [from] = 'steemplus-bot'
+        and [to] = 'steemplus-bot'
+        and memo LIKE '%priceHistory%'
+        ORDER BY timestamp DESC;
+        `)})
+      .then(result => {
+        // get result
+        priceHistory = result.recordsets[0];
+        sql.close();
+      }).catch(error => {console.log(error);
+    sql.close();});
+
+    new sql.ConnectionPool(config.config_api).connect().then(pool => {
+      return pool.request()
+      .query(`
+        SELECT delegator, vesting_shares, timestamp
+        FROM TxDelegateVestingShares
+        WHERE delegatee = 'steem-plus';
+        `)})
+      .then(result => {
+        // get result
+        payDelegations(result.recordset);
+        res.status(200).send("OK");
+        sql.close();
+      }).catch(error => {console.log(error);
+    sql.close();});
+
+  });
 }
+
+function payDelegations(historyDelegations){
+  let delegations = {};
+  for(delegation of historyDelegations){
+    if(delegations[delegation.delegator] === undefined){
+      delegations[delegation.delegator] = [];
+    }
+    // var jsonPrice = findSteemplusPrice(comment.created);
+    // var totalSteem = jsonPrice.totalSteem;
+    // var totalVests = jsonPrice.totalVests;
+
+    // Get the amount of the transaction
+    //var amountSP = steem.formatter.vestToSteem(parseFloat(delegation.vesting_shares), totalVests, totalSteem).toFixed(3);
+    delegations[delegation.delegator].push({
+      "vesting_shares": delegation.vesting_shares,
+      "timestamp": delegation.timestamp 
+    });
+    delegations[delegation.delegator].sort(function(a, b){return a.timestamp-b.timestamp});
+  }
+
+  let payments = [];
+  let dateStartSPP = new Date('2017-08-03 12:05:42.000');
+  let dateNow = new Date();
+  let startDate;
+  let minuteNow = dateNow.getUTCMinutes() - dateNow.getUTCMinutes()%10;
+  let periodNow = `${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth()+1}-${dateNow.getUTCDate()} ${dateNow.getUTCHours()}:${minuteNow}:00.000`;
+  
+  Object.keys(delegations).map(function(delegator, index) {
+    let dateFirstDelegation = new Date(delegations[delegator][0].timestamp);
+    
+    if(dateFirstDelegation <= dateStartSPP)
+      startDate = dateStartSPP;
+    else
+      startDate = dateFirstDelegation;
+
+    let date = startDate;
+    let countDays = 0;
+    while(date < dateNow){
+      console.log(date);
+      date = addOneDay(date);
+      if(countDays === 7){
+        let jsonPrice = findSteemplusPrice(date);
+        let totalSteem = jsonPrice.totalSteem;
+        let totalVests = jsonPrice.totalVests;
+        let ratioSBDSteem = jsonPrice.price;
+        let amount = steem.formatter.vestToSteem(parseFloat(delegations[delegator].vesting_shares), totalVests, totalSteem).toFixed(3)*ratioSBDSteem/4;
+        payments.push({paymentDate: date, payment: amount});
+        countDays = 0;
+      }
+      countDays++;
+    }
+    console.log(payments);
+    console.log('------------------------------');
+  });
+}
+
+function addOneDay(date) {
+  var result = new Date(date);
+  result.setDate(result.getDate() + 1);
+  return result;
+}
+
 
 // Function used to process the voting routine
 // @parameter spAccount : SteemPlus account
