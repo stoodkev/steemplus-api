@@ -475,7 +475,7 @@ var appRouter = function (app) {
     res.status(200).send("OK");
   });
 
-  app.get("/job/spp_stats/:key", async function(req, res){
+  app.get("/get-spp-stats", async function(req, res){
     let result={};
     if(req.params.key==config.key){
       const points_per_user =
