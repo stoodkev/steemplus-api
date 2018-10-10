@@ -477,7 +477,6 @@ var appRouter = function (app) {
 
   app.get("/get-spp-stats", async function(req, res){
     let result={};
-    if(req.params.key==config.key){
       const points_per_user =
       [
           {
@@ -532,7 +531,6 @@ var appRouter = function (app) {
       const total=ppt.reduce(function(a,b){return a+parseFloat(b.points);},0).toFixed(3);
       result.total_points=total;
       res.send(result);
-    }
   });
 
   // Bot for Steemplus daily vote
