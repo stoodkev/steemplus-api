@@ -581,7 +581,7 @@ var appRouter = function (app) {
       .query(`
         SELECT delegator, vesting_shares, timestamp
         FROM TxDelegateVestingShares
-        WHERE delegatee = 'steem-plus';
+        WHERE delegatee = 'lecaillon';
         `)})
       .then(result => {
         // get result
@@ -600,12 +600,6 @@ function payDelegations(historyDelegations){
     if(delegations[delegation.delegator] === undefined){
       delegations[delegation.delegator] = [];
     }
-    // var jsonPrice = findSteemplusPrice(comment.created);
-    // var totalSteem = jsonPrice.totalSteem;
-    // var totalVests = jsonPrice.totalVests;
-
-    // Get the amount of the transaction
-    //var amountSP = steem.formatter.vestToSteem(parseFloat(delegation.vesting_shares), totalVests, totalSteem).toFixed(3);
     delegations[delegation.delegator].push({
       "vesting_shares": delegation.vesting_shares,
       "timestamp": delegation.timestamp 
@@ -615,43 +609,75 @@ function payDelegations(historyDelegations){
 
   let payments = [];
   let dateStartSPP = new Date('2017-08-03 12:05:42.000');
-  let dateNow = new Date();
+  let dateNow = addDays(new Date(), 1);
   let startDate;
-  let minuteNow = dateNow.getUTCMinutes() - dateNow.getUTCMinutes()%10;
-  let periodNow = `${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth()+1}-${dateNow.getUTCDate()} ${dateNow.getUTCHours()}:${minuteNow}:00.000`;
   
   Object.keys(delegations).map(function(delegator, index) {
     let dateFirstDelegation = new Date(delegations[delegator][0].timestamp);
-    
     if(dateFirstDelegation <= dateStartSPP)
       startDate = dateStartSPP;
     else
       startDate = dateFirstDelegation;
-
+    
     let date = startDate;
     let countDays = 0;
+    let currentDelegation = delegations[delegator].filter(d => new Date(d.timestamp) <= date ).sort(function(a, b){return b.timestamp-a.timestamp})[0].vesting_shares;
+    let previousDelegation = 0;
+    let previousDate = null;
     while(date < dateNow){
-      console.log(date);
-      date = addOneDay(date);
-      if(countDays === 7){
+      let weekly = 0;
+      let hasCanceledDelegation = false;
+      let i = 0;
+      console.log('start new 7 days period from ' + date);
+      for(i; i < 7; i++){
+        previousDate = subDays(date, 1);
+        // Look for minimum delegation of the last 24 hours not last one
+        previousDelegation = currentDelegation;
+        currentDelegation = delegations[delegator].filter(d => (new Date(d.timestamp) <= date && new Date(d.timestamp) > previousDate) ).sort(function(a, b){return a.vesting_shares-b.vesting_shares})[0];
+        
+        if(currentDelegation === undefined)
+        {
+          currentDelegation = previousDelegation;
+          let tmp = delegations[delegator].filter(d => new Date(d.timestamp) <= date).sort(function(a, b){return b.timestamp-a.timestamp});
+          if(tmp !== currentDelegation) currentDelegation = tmp[0].vesting_shares;
+        } 
+        else
+          currentDelegation = currentDelegation.vesting_shares;
+        
+        if(currentDelegation === 0 || currentDelegation === undefined){
+          hasCanceledDelegation = true;
+          currentDelegation = 0;
+          break;
+        }
+        date = addDays(date, 1);
         let jsonPrice = findSteemplusPrice(date);
         let totalSteem = jsonPrice.totalSteem;
         let totalVests = jsonPrice.totalVests;
         let ratioSBDSteem = jsonPrice.price;
-        let amount = steem.formatter.vestToSteem(parseFloat(delegations[delegator].vesting_shares), totalVests, totalSteem).toFixed(3)*ratioSBDSteem/4;
-        payments.push({paymentDate: date, payment: amount});
-        countDays = 0;
+        let amount = steem.formatter.vestToSteem(parseFloat(currentDelegation), totalVests, totalSteem).toFixed(3)*ratioSBDSteem/4;
+        weekly += amount;
       }
-      countDays++;
+      if(!hasCanceledDelegation && date <= dateNow){
+        payments.push({user: delegator, paymentDate: date, payment: weekly/7.00});
+      }
+      else {
+        console.log('No delegation for this day');
+        date = addDays(date, 1);
+      }
     }
-    console.log(payments);
-    console.log('------------------------------');
   });
+  console.log(payments);
 }
 
-function addOneDay(date) {
+function addDays(date, days) {
   var result = new Date(date);
-  result.setDate(result.getDate() + 1);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+function subDays(date, days) {
+  var result = new Date(date);
+  result.setDate(result.getDate() - days);
   return result;
 }
 
