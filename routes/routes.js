@@ -581,7 +581,8 @@ var appRouter = function (app) {
       .query(`
         SELECT delegator, vesting_shares, timestamp
         FROM TxDelegateVestingShares
-        WHERE delegatee = 'lecaillon';
+        WHERE delegatee = 'steem-plus'
+        AND timestamp > CONVERT(datetime,'2018-08-03 12:05:42.000');
         `)})
       .then(result => {
         // get result
@@ -609,7 +610,7 @@ function payDelegations(historyDelegations){
 
   let payments = [];
   let dateStartSPP = new Date('2017-08-03 12:05:42.000');
-  let dateNow = addDays(new Date(), 1);
+  let dateNow = new Date();
   let startDate;
   
   Object.keys(delegations).map(function(delegator, index) {
@@ -654,7 +655,7 @@ function payDelegations(historyDelegations){
         let totalSteem = jsonPrice.totalSteem;
         let totalVests = jsonPrice.totalVests;
         let ratioSBDSteem = jsonPrice.price;
-        let amount = steem.formatter.vestToSteem(parseFloat(currentDelegation), totalVests, totalSteem).toFixed(3)*ratioSBDSteem/4;
+        let amount = steem.formatter.vestToSteem(parseFloat(currentDelegation), totalVests, totalSteem).toFixed(3)*ratioSBDSteem;
         weekly += amount;
       }
       if(!hasCanceledDelegation && date <= dateNow){
