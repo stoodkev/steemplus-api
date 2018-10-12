@@ -490,6 +490,40 @@ var appRouter = function (app) {
             sql.close();
           }).catch(error => {console.log(error);
         sql.close();});
+
+        // Get the last entry the requestType 0 (Comments)
+        var lastEntry = await PointsDetail.find({requestType: 4}).sort({timestamp: -1}).limit(1);
+        // Get the creation date of the last entry
+        var lastEntryDate = null;
+        if(lastEntry[0] !== undefined)
+          lastEntryDate = lastEntry[0].timestampString;
+        else
+          lastEntryDate = '2018-08-03 12:05:42.000'; // This date is the steemplus point annoncement day + 7 days for rewards because rewards come after 7 days.
+        // Wait for SteemSQL's query result before starting the second request
+        // We decided to wait to be sure this function won't try to update the same row twice at the same time
+        await new sql.ConnectionPool(config.config_api).connect().then(pool => {
+          return pool.request()
+          .query(`
+            SELECT *
+            FROM Reblogs 
+            WHERE author = 'steem-plus' 
+            AND timestamp > CONVERT(datetime, '${lastEntryDate}')
+            AND permlink IN (
+              SELECT permlink 
+              FROM Comments 
+              WHERE author = 'steem-plus' 
+              AND depth = 0 
+              AND created > DATEADD(day, -7, GETUTCDATE())
+            );
+          `)})
+          .then(result => {
+            // get result
+            var reblogs = result.recordsets[0];
+            // Start data processing
+            updateSteemplusPointsReblogs(reblogs);
+            sql.close();
+          }).catch(error => {console.log(error);
+        sql.close();});
       });
     },0);
     res.status(200).send("OK");
@@ -812,6 +846,34 @@ function hasUncorrectPercent(posts)
   return false;
 }
 
+// Function used to process the data from SteemSQL for requestType == 4
+// @parameter transfers : transfers data received from SteemSQL
+async function updateSteemplusPointsReblogs(reblogs) {
+  // Number of new entry in the DB
+  var nbPointDetailsAdded = 0;
+  console.log(`Adding ${reblogs.length} new reblog(s) to DB`);
+  for(reblog of reblogs){
+    let user = await User.findOne({accountName: reblog.account});
+    if(user === null)
+    {
+      // If not, create it
+      user = new User({accountName: reblog.account, nbPoints: 0});
+      user = await user.save();
+    }
+    let type = await TypeTransaction.findOne({name: 'Reblogs'});
+    // Create new PointsDetail entry
+    let nbPoints = 50;
+    let pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: nbPoints, amountSymbol: '', permlink: reblog.permlink, user: user._id, typeTransaction: type._id, timestamp: reblog.timestamp, timestampString: utils.formatDate(reblog.timestamp), requestType: 4});
+    pointsDetail = await pointsDetail.save();
+
+    // Update user account
+    user.pointsDetails.push(pointsDetail);
+    user.nbPoints = user.nbPoints + nbPoints;
+    await user.save();
+    nbPointDetailsAdded++;
+  }
+  console.log(`Added ${nbPointDetailsAdded} pointDetails`);
+}
 // Function used to process the data from SteemSQL for requestType == 1
 // @parameter transfers : transfers data received from SteemSQL
 function updateSteemplusPointsTransfers(transfers)
