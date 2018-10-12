@@ -7,6 +7,12 @@ var User = require('../models/user');
 var PointsDetail = require('../models/pointsDetail');
 var TypeTransaction = require('../models/typeTransaction');
 var LastVote = require('../models/lastVote');
+var JSDOM = require('jsdom').JSDOM;
+var jsdom = new JSDOM('<body><div id="container" style="width: 100%;height: 100%;margin: 50px;padding: 50px;"></div></body>', {runScripts: 'dangerously'});
+var window = jsdom.window;
+var anychart = require('anychart')(window);
+var anychartExport = require('anychart-nodejs')(anychart);
+
 var totalVests = null;
 var totalSteem = null;
 var ratioSBDSteem = null;
@@ -227,7 +233,7 @@ var appRouter = function (app) {
       else
         console.log("Nothing to claim!");
       if(((parseFloat(steemPlusPay[0].reward_steem_balance.split(" ")[0])+parseFloat(steemPlusPay[0].balance.split(" ")[0])).toFixed(3)+" STEEM")!="0.000 STEEM"){
-        await steem.broadcast.tranferToVestingAsync(config.payActKey, 'steemplus-pay', 'steemplus-pay', (parseFloat(steemPlusPay[0].reward_steem_balance.split(" ")[0])+parseFloat(steemPlusPay[0].balance.split(" ")[0])).toFixed(3)+" STEEM");
+        await steem.broadcast.transferToVestingAsync(config.payActKey, 'steemplus-pay', 'steemplus-pay', (parseFloat(steemPlusPay[0].reward_steem_balance.split(" ")[0])+parseFloat(steemPlusPay[0].balance.split(" ")[0])).toFixed(3)+" STEEM");
         console.log("Powered up "+(parseFloat(steemPlusPay[0].reward_steem_balance.split(" ")[0])+parseFloat(steemPlusPay[0].balance.split(" ")[0])).toFixed(3)+" STEEM");
       }
       else
@@ -489,7 +495,13 @@ var appRouter = function (app) {
     res.status(200).send("OK");
   });
 
-  app.get("/get-spp-stats", async function(req, res){
+  app.get("/get-spp-stats",  function(req, res){
+      const result=getSppStats();
+      res.send(result);
+  });
+
+
+  async function getSppStats(){
     let result={};
       const points_per_user =
       [
@@ -515,7 +527,6 @@ var appRouter = function (app) {
             delete doc._id;
             return  doc;
         });
-        console.log(ppu);
       result.points_per_user=ppu;
       const points_per_transaction =
       [
@@ -541,12 +552,11 @@ var appRouter = function (app) {
                   return  doc;
               });
       ppt=await Promise.all(ppt);
-      console.log(ppt);
       result.points_per_transaction=ppt;
       const total=ppt.reduce(function(a,b){return a+parseFloat(b.points);},0).toFixed(3);
       result.total_points=total;
-      res.send(result);
-  });
+      return result;
+  }
 
   // Bot for Steemplus daily vote
   app.get("/job/bot-vote/:key", function(req, res){
