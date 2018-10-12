@@ -495,8 +495,8 @@ var appRouter = function (app) {
     res.status(200).send("OK");
   });
 
-  app.get("/get-spp-stats",  function(req, res){
-      const result=getSppStats();
+  app.get("/get-spp-stats", async  function(req, res){
+      const result= await getSppStats();
       res.send(result);
   });
 
@@ -679,7 +679,6 @@ async function getSppStats(){
   result.points_per_transaction=ppt;
   const total=ppt.reduce(function(a,b){return a+parseFloat(b.points);},0).toFixed(3);
   result.total_points=total;
-  
   return result;
 }
 
@@ -706,7 +705,7 @@ async function payDelegations(historyDelegations){
 
   let payments = [];
   let dateStartSPP = new Date('2017-08-03 12:05:42.000');
-  let dateNow = addDays(new Date(), 7);
+  let dateNow = new Date();
   
   // For each delegator
   for(delegator of delegators) {
@@ -719,7 +718,7 @@ async function payDelegations(historyDelegations){
       // Get his last POintDetails with type 3 (delegation);
       lastPointDetail = await PointsDetail.find({requestType: 3, user: user._id}).sort({timestamp: -1}).limit(1);
       // If there is one, use its date as start date
-      if(lastPointDetail !== null)
+      if(lastPointDetail[0] !== null && lastPointDetail[0] !== undefined)
         startDate = new Date(lastPointDetail[0].timestampString);
     }
     // If startDate is still null or undefined, get start date depending on the delegations
