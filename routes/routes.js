@@ -500,64 +500,6 @@ var appRouter = function (app) {
       res.send(result);
   });
 
-
-  async function getSppStats(){
-    let result={};
-      const points_per_user =
-      [
-          {
-              "$group":{
-                  "_id" :"$accountName",
-                  "points": {
-                      "$sum": "$nbPoints"
-                  }
-              }
-          },
-          {
-            "$sort": { "points": -1 }
-          }
-      ];
-
-      let ppu=await User.aggregate(points_per_user)
-            .exec();
-      ppu = ppu.map(function(doc) {
-            doc.name = doc._id;
-            doc._id = doc.origId;
-            doc.points=doc.points.toFixed(3);
-            delete doc._id;
-            return  doc;
-        });
-      result.points_per_user=ppu;
-      const points_per_transaction =
-      [
-          {
-              "$group":{
-                  "_id" : "$typeTransaction",
-                  "points": {
-                      "$sum": "$nbPoints"
-                  }
-              }
-          },
-          {
-            "$sort": { "points": -1 }
-          }
-      ];
-      let ppt=await PointsDetail.aggregate(points_per_transaction)
-            .exec();
-            ppt =  ppt.map(async function(doc) {
-                  let a = await TypeTransaction.findById(doc._id).exec();
-                  doc.type=a.name;
-                  doc.points=doc.points.toFixed(3);
-                  delete doc._id;
-                  return  doc;
-              });
-      ppt=await Promise.all(ppt);
-      result.points_per_transaction=ppt;
-      const total=ppt.reduce(function(a,b){return a+parseFloat(b.points);},0).toFixed(3);
-      result.total_points=total;
-      return result;
-  }
-
   // Bot for Steemplus daily vote
   app.get("/job/bot-vote/:key", function(req, res){
     if(req.params.key !== config.key)
@@ -659,6 +601,7 @@ var appRouter = function (app) {
       }).catch(error => {console.log(error);
     sql.close();});
 
+    // Start delegation request
     new sql.ConnectionPool(config.config_api).connect().then(pool => {
       return pool.request()
       .query(`
@@ -668,7 +611,7 @@ var appRouter = function (app) {
         AND timestamp > CONVERT(datetime,'2018-08-03 12:05:42.000');
         `)})
       .then(result => {
-        // get result
+        // get result and start delegation payment
         payDelegations(result.recordset);
         res.status(200).send("OK");
         sql.close();
@@ -678,34 +621,108 @@ var appRouter = function (app) {
   });
 }
 
+// Function used to get statistics about SPP : 
+// - Total amount delivered
+// - Total per user
+// - Total per categories
+async function getSppStats(){
+  let result={};
+  const points_per_user =
+  [
+    {
+      "$group":{
+        "_id" :"$accountName",
+        "points": {
+          "$sum": "$nbPoints"
+        }
+      }
+    },
+    {
+      "$sort": { "points": -1 }
+    }
+  ];
+
+  let ppu=await User.aggregate(points_per_user).exec();
+  ppu = ppu.map(function(doc) {
+    doc.name = doc._id;
+    doc._id = doc.origId;
+    doc.points=doc.points.toFixed(3);
+    delete doc._id;
+    return doc;
+  });
+  result.points_per_user=ppu;
+  const points_per_transaction =
+  [
+    {
+      "$group":
+      {
+        "_id" : "$typeTransaction",
+        "points": 
+        {
+          "$sum": "$nbPoints"
+        }
+      }
+    },
+    {
+      "$sort": { "points": -1 }
+    }
+  ];
+  let ppt=await PointsDetail.aggregate(points_per_transaction).exec();
+  ppt = ppt.map(async function(doc) {
+    let a = await TypeTransaction.findById(doc._id).exec();
+    doc.type=a.name;
+    doc.points=doc.points.toFixed(3);
+    delete doc._id;
+    return doc;
+  });
+  ppt=await Promise.all(ppt);
+  result.points_per_transaction=ppt;
+  const total=ppt.reduce(function(a,b){return a+parseFloat(b.points);},0).toFixed(3);
+  result.total_points=total;
+  
+  return result;
+}
+
+// Function used to credit account for delegations
 async function payDelegations(historyDelegations){
+  // Init arrays
   let delegations = {};
   let delegators = [];
+  // Create hashmaps with users delegations
   for(delegation of historyDelegations){
+    // If user not in the hashmap, create array
     if(delegations[delegation.delegator] === undefined){
       delegations[delegation.delegator] = [];
       delegators.push(delegation.delegator);
     }
+    // ... And add values
     delegations[delegation.delegator].push({
       "vesting_shares": delegation.vesting_shares,
       "timestamp": delegation.timestamp 
     });
+    // Sort delegations from the oldest to the most recent
     delegations[delegation.delegator].sort(function(a, b){return a.timestamp-b.timestamp});
   }
 
-  console.log(delegators);
   let payments = [];
   let dateStartSPP = new Date('2017-08-03 12:05:42.000');
   let dateNow = addDays(new Date(), 7);
   
+  // For each delegator
   for(delegator of delegators) {
     let startDate = null;
+    // Find last payment of a user
+    // Retrive user
     let user = await User.findOne({accountName: delegator});
+    // If user is NOT null
     if(user !== null){
+      // Get his last POintDetails with type 3 (delegation);
       lastPointDetail = await PointsDetail.find({requestType: 3, user: user._id}).sort({timestamp: -1}).limit(1);
+      // If there is one, use its date as start date
       if(lastPointDetail !== null)
         startDate = new Date(lastPointDetail[0].timestampString);
     }
+    // If startDate is still null or undefined, get start date depending on the delegations
     if(startDate === null || startDate === undefined){
       let dateFirstDelegation = new Date(delegations[delegator][0].timestamp);
       if(dateFirstDelegation <= dateStartSPP)
@@ -722,7 +739,7 @@ async function payDelegations(historyDelegations){
     currentDelegation = delegations[delegator].filter(d => (new Date(d.timestamp) <= date && new Date(d.timestamp) > previousDate) ).sort(function(a, b){return a.vesting_shares-b.vesting_shares})[0];
     if(currentDelegation === undefined)
     {
-
+      // If delegation is undefined try to use previous
       currentDelegation = previousDelegation;
       let tmp = delegations[delegator].filter(d => new Date(d.timestamp) <= date).sort(function(a, b){return b.timestamp-a.timestamp});
       if(tmp !== currentDelegation) currentDelegation = tmp[0].vesting_shares;
@@ -730,16 +747,20 @@ async function payDelegations(historyDelegations){
     else
       currentDelegation = currentDelegation.vesting_shares;
 
+    // This loop will check everyday until 'today'
     while(date < dateNow){
       let weekly = 0;
       let hasCanceledDelegation = false;
       let i = 0;
       console.log('start new 7 days period from ' + date);
+      // We decided to pay delegation every 7 days
+      // User can get a reward if he delegated for 7 days in a row.
       for(i; i < 7; i++){
         // Look for minimum delegation of the last 24 hours not last one
         previousDelegation = currentDelegation;
         currentDelegation = delegations[delegator].filter(d => (new Date(d.timestamp) <= date && new Date(d.timestamp) > previousDate) ).sort(function(a, b){return a.vesting_shares-b.vesting_shares})[0];
         
+        // Same behavior as during the init part
         if(currentDelegation === undefined)
         {
           currentDelegation = previousDelegation;
@@ -749,22 +770,29 @@ async function payDelegations(historyDelegations){
         else
           currentDelegation = currentDelegation.vesting_shares;
         
+        // If currentDelegation is undefined or 0, this means user stopped delegating.
         if(currentDelegation === 0 || currentDelegation === undefined){
           hasCanceledDelegation = true;
           currentDelegation = 0;
           break;
         }
+
+        // Go to next day.
         date = addDays(date, 1);
         previousDate = subDays(date, 1);
+        // Retrive price informations
         let jsonPrice = findSteemplusPrice(date);
         let totalSteem = jsonPrice.totalSteem;
         let totalVests = jsonPrice.totalVests;
         let ratioSBDSteem = jsonPrice.price;
+
+        // Calculate amount of SPP
         let amount = steem.formatter.vestToSteem(parseFloat(currentDelegation), totalVests, totalSteem).toFixed(3)*ratioSBDSteem;
         weekly += amount;
       }
+      // After 7 days in a row, if user hasn't canceled
       if(!hasCanceledDelegation && date <= dateNow){
-        // payments.push({user: delegator, paymentDate: date, value: weekly/7.00});
+        // Create new PointsDetail
         let user = await User.findOne({accountName: delegator});
         if(user === null)
         {
@@ -791,34 +819,16 @@ async function payDelegations(historyDelegations){
       }
     }
   }
-  // for(payment of payments){
-  //   let user = await User.findOne({accountName: payment.user});
-  //   if(user === null)
-  //   {
-  //     // If not create it
-  //     user = new User({accountName: payment.user, nbPoints: 0});
-  //     // Need to wait for the creation to be done to be able to use the object
-  //     user = await user.save();
-  //   }
-  //   type = await TypeTransaction.findOne({name: 'Delegation'});
-
-  //   // Create new PointsDetail entry
-  //   var pointsDetail = new PointsDetail({nbPoints: payment.value, amount: payment, amountSymbol: 'SP', permlink: '', user: user._id, typeTransaction: type._id, timestamp: payment.paymentDate, timestampString: utils.formatDate(payment.paymentDate), requestType: 3});
-  //   pointsDetail = await pointsDetail.save();
-
-  //   // Update user account
-  //   user.pointsDetails.push(pointsDetail);
-  //   user.nbPoints = user.nbPoints + nbPoints;
-  //   await user.save();
-  // }
 }
 
+// Function used to add a given number of days
 function addDays(date, days) {
   var result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
 }
 
+// FUnction used to substract a given number of days
 function subDays(date, days) {
   var result = new Date(date);
   result.setDate(result.getDate() - days);
