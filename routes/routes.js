@@ -495,8 +495,10 @@ var appRouter = function (app) {
     res.status(200).send("OK");
   });
 
-  app.get("/get-spp-stats",  function(req, res){
-      const result=getSppStats();
+  app.get("/get-spp-stats", async  function(req, res){
+      const result= await getSppStats();
+      console.log(result);
+      console.log("finished");
       res.send(result);
   });
 
@@ -679,7 +681,7 @@ async function getSppStats(){
   result.points_per_transaction=ppt;
   const total=ppt.reduce(function(a,b){return a+parseFloat(b.points);},0).toFixed(3);
   result.total_points=total;
-  
+  console.log(result);
   return result;
 }
 
