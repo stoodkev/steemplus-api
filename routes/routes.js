@@ -668,11 +668,13 @@ var appRouter = function (app) {
   });
 }
 
-function payDelegations(historyDelegations){
+async function payDelegations(historyDelegations){
   let delegations = {};
+  let delegators = [];
   for(delegation of historyDelegations){
     if(delegations[delegation.delegator] === undefined){
       delegations[delegation.delegator] = [];
+      delegators.push(delegation.delegator);
     }
     delegations[delegation.delegator].push({
       "vesting_shares": delegation.vesting_shares,
@@ -681,30 +683,49 @@ function payDelegations(historyDelegations){
     delegations[delegation.delegator].sort(function(a, b){return a.timestamp-b.timestamp});
   }
 
+  console.log(delegators);
   let payments = [];
   let dateStartSPP = new Date('2017-08-03 12:05:42.000');
-  let dateNow = new Date();
-  let startDate;
+  let dateNow = addDays(new Date(), 7);
   
-  Object.keys(delegations).map(function(delegator, index) {
-    let dateFirstDelegation = new Date(delegations[delegator][0].timestamp);
-    if(dateFirstDelegation <= dateStartSPP)
-      startDate = dateStartSPP;
-    else
-      startDate = dateFirstDelegation;
-    
+  for(delegator of delegators) {
+    let startDate = null;
+    let user = await User.findOne({accountName: delegator});
+    if(user !== null){
+      lastPointDetail = await PointsDetail.find({requestType: 3, user: user._id}).sort({timestamp: -1}).limit(1);
+      if(lastPointDetail !== null)
+        startDate = new Date(lastPointDetail[0].timestampString);
+    }
+    if(startDate === null || startDate === undefined){
+      let dateFirstDelegation = new Date(delegations[delegator][0].timestamp);
+      if(dateFirstDelegation <= dateStartSPP)
+        startDate = dateStartSPP;
+      else
+        startDate = dateFirstDelegation;  
+    }
     let date = startDate;
     let countDays = 0;
-    let currentDelegation = delegations[delegator].filter(d => new Date(d.timestamp) <= date ).sort(function(a, b){return b.timestamp-a.timestamp})[0].vesting_shares;
-    let previousDelegation = 0;
-    let previousDate = null;
+    let currentDelegation = 0;
+    let previousDate = subDays(date, 1);
+    let previousDelegation = delegations[delegator].filter(d => new Date(d.timestamp) <= date).sort(function(a, b){return b.timestamp-a.timestamp})[0].vesting_shares;
+    // Look for minimum delegation of the last 24 hours not last one
+    currentDelegation = delegations[delegator].filter(d => (new Date(d.timestamp) <= date && new Date(d.timestamp) > previousDate) ).sort(function(a, b){return a.vesting_shares-b.vesting_shares})[0];
+    if(currentDelegation === undefined)
+    {
+
+      currentDelegation = previousDelegation;
+      let tmp = delegations[delegator].filter(d => new Date(d.timestamp) <= date).sort(function(a, b){return b.timestamp-a.timestamp});
+      if(tmp !== currentDelegation) currentDelegation = tmp[0].vesting_shares;
+    } 
+    else
+      currentDelegation = currentDelegation.vesting_shares;
+
     while(date < dateNow){
       let weekly = 0;
       let hasCanceledDelegation = false;
       let i = 0;
       console.log('start new 7 days period from ' + date);
       for(i; i < 7; i++){
-        previousDate = subDays(date, 1);
         // Look for minimum delegation of the last 24 hours not last one
         previousDelegation = currentDelegation;
         currentDelegation = delegations[delegator].filter(d => (new Date(d.timestamp) <= date && new Date(d.timestamp) > previousDate) ).sort(function(a, b){return a.vesting_shares-b.vesting_shares})[0];
@@ -724,6 +745,7 @@ function payDelegations(historyDelegations){
           break;
         }
         date = addDays(date, 1);
+        previousDate = subDays(date, 1);
         let jsonPrice = findSteemplusPrice(date);
         let totalSteem = jsonPrice.totalSteem;
         let totalVests = jsonPrice.totalVests;
@@ -732,15 +754,53 @@ function payDelegations(historyDelegations){
         weekly += amount;
       }
       if(!hasCanceledDelegation && date <= dateNow){
-        payments.push({user: delegator, paymentDate: date, payment: weekly/7.00});
+        // payments.push({user: delegator, paymentDate: date, value: weekly/7.00});
+        let user = await User.findOne({accountName: delegator});
+        if(user === null)
+        {
+          // If not create it
+          user = new User({accountName: delegator, nbPoints: 0});
+          // Need to wait for the creation to be done to be able to use the object
+          user = await user.save();
+        }
+        type = await TypeTransaction.findOne({name: 'Delegation'});
+
+        let nbPoints = weekly/7.00;
+        // Create new PointsDetail entry
+        var pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: nbPoints, amountSymbol: 'SP', permlink: '', user: user._id, typeTransaction: type._id, timestamp: date, timestampString: utils.formatDate(date), requestType: 3});
+        pointsDetail = await pointsDetail.save();
+
+        // Update user account
+        user.pointsDetails.push(pointsDetail);
+        user.nbPoints = user.nbPoints + nbPoints;
+        await user.save();
       }
       else {
         console.log('No delegation for this day');
         date = addDays(date, 1);
       }
     }
-  });
-  console.log(payments);
+  }
+  // for(payment of payments){
+  //   let user = await User.findOne({accountName: payment.user});
+  //   if(user === null)
+  //   {
+  //     // If not create it
+  //     user = new User({accountName: payment.user, nbPoints: 0});
+  //     // Need to wait for the creation to be done to be able to use the object
+  //     user = await user.save();
+  //   }
+  //   type = await TypeTransaction.findOne({name: 'Delegation'});
+
+  //   // Create new PointsDetail entry
+  //   var pointsDetail = new PointsDetail({nbPoints: payment.value, amount: payment, amountSymbol: 'SP', permlink: '', user: user._id, typeTransaction: type._id, timestamp: payment.paymentDate, timestampString: utils.formatDate(payment.paymentDate), requestType: 3});
+  //   pointsDetail = await pointsDetail.save();
+
+  //   // Update user account
+  //   user.pointsDetails.push(pointsDetail);
+  //   user.nbPoints = user.nbPoints + nbPoints;
+  //   await user.save();
+  // }
 }
 
 function addDays(date, days) {
