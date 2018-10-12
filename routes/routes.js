@@ -706,7 +706,7 @@ async function payDelegations(historyDelegations){
 
   let payments = [];
   let dateStartSPP = new Date('2017-08-03 12:05:42.000');
-  let dateNow = addDays(new Date(), 7);
+  let dateNow = new Date();
   
   // For each delegator
   for(delegator of delegators) {
