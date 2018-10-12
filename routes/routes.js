@@ -719,7 +719,7 @@ async function payDelegations(historyDelegations){
       // Get his last POintDetails with type 3 (delegation);
       lastPointDetail = await PointsDetail.find({requestType: 3, user: user._id}).sort({timestamp: -1}).limit(1);
       // If there is one, use its date as start date
-      if(lastPointDetail !== null)
+      if(lastPointDetail[0] !== null && lastPointDetail[0] !== undefined)
         startDate = new Date(lastPointDetail[0].timestampString);
     }
     // If startDate is still null or undefined, get start date depending on the delegations
