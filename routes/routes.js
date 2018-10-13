@@ -491,7 +491,7 @@ var appRouter = function (app) {
           }).catch(error => {console.log(error);
         sql.close();});
 
-        // Get the last entry the requestType 0 (Comments)
+        // Get the last entry the requestType 4 (Reblogs)
         var lastEntry = await PointsDetail.find({requestType: 4}).sort({timestamp: -1}).limit(1);
         // Get the creation date of the last entry
         var lastEntryDate = null;
@@ -504,17 +504,15 @@ var appRouter = function (app) {
         await new sql.ConnectionPool(config.config_api).connect().then(pool => {
           return pool.request()
           .query(`
-            SELECT *
-            FROM Reblogs 
-            WHERE author = 'steem-plus' 
+            SELECT account, Reblogs.permlink, timestamp
+            FROM Reblogs
+            INNER JOIN Comments
+            ON Comments.author = Reblogs.author
+            AND Comments.permlink = Reblogs.permlink
+            WHERE Comments.author = 'steem-plus' 
             AND timestamp > CONVERT(datetime, '${lastEntryDate}')
-            AND permlink IN (
-              SELECT permlink 
-              FROM Comments 
-              WHERE author = 'steem-plus' 
-              AND depth = 0 
-              AND created > DATEADD(day, -7, GETUTCDATE())
-            );
+            AND depth = 0
+            AND Comments.created > DATEADD(day, -7, timestamp);
           `)})
           .then(result => {
             // get result
@@ -1061,9 +1059,9 @@ async function updateSteemplusPointsReblogs(reblogs) {
       user = new User({accountName: reblog.account, nbPoints: 0});
       user = await user.save();
     }
-    let type = await TypeTransaction.findOne({name: 'Reblogs'});
+    let type = await TypeTransaction.findOne({name: 'Reblog'});
     // Create new PointsDetail entry
-    let nbPoints = 50;
+    let nbPoints = 20;
     let pointsDetail = new PointsDetail({nbPoints: nbPoints, amount: nbPoints, amountSymbol: '', permlink: reblog.permlink, user: user._id, typeTransaction: type._id, timestamp: reblog.timestamp, timestampString: utils.formatDate(reblog.timestamp), requestType: 4});
     pointsDetail = await pointsDetail.save();
 
