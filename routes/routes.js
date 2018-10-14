@@ -104,10 +104,8 @@ var appRouter = function (app) {
     new sql.ConnectionPool(config.config_api).connect().then(pool => {
       console.log("connected");
       return pool.request()
-      .input("username2","%"+req.params.username+"%")
       .input("username",req.params.username)
-      .query("SELECT MyAccounts.timestamp, MyAccounts.account, (ISNULL(TRY_CONVERT(float,REPLACE(value_proxy,'VESTS','')),0) + TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS',''))) as totalVests, TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS','')) as accountVests, ISNULL(TRY_CONVERT(float,REPLACE(value_proxy,'VESTS','')),0) as proxiedVests \
-              FROM (SELECT B.timestamp, B.account,A.vesting_shares FROM Accounts A, (select timestamp, account from TxAccountWitnessVotes where ID IN (select MAX(ID)as last from TxAccountWitnessVotes where witness=@username group by account) and approve=1)as B where B.account=A.name)as MyAccounts LEFT JOIN(SELECT proxy as name,SUM(TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS',''))) as value_proxy FROM Accounts WHERE proxy IN ( SELECT name FROM Accounts WHERE witness_votes LIKE @username2 and proxy != '')GROUP BY(proxy))as proxy_table ON MyAccounts.account=proxy_table.name")})
+      .query("WITH proxySelect AS ( SELECT t.*, ROW_NUMBER() OVER (PARTITION BY account ORDER BY timestamp DESC) AS rn FROM TxAccountWitnessProxies AS t ) SELECT MyAccounts.timestamp, MyAccounts.account, (ISNULL(total_proxied,0) + TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS',''))) as totalVests, TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS','')) as accountVests, ISNULL(total_proxied,0) as proxiedVests FROM (SELECT B.timestamp, B.account,A.vesting_shares FROM Accounts A, (select timestamp, account from TxAccountWitnessVotes where ID IN (select MAX(ID)as last from TxAccountWitnessVotes where witness=@username group by account) and approve=1)as B where B.account=A.name)as MyAccounts LEFT JOIN (SELECT SUM(TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS',''))) as total_proxied, pr.proxy FROM proxySelect pr INNER JOIN Accounts ON pr.account=name WHERE rn = 1 GROUP BY pr.proxy) pr2 ON pr2.proxy=MyAccounts.account;")})
       .then(result => {
       res.status(200).send(result.recordsets[0]);
       sql.close();
