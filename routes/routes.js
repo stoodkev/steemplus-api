@@ -239,12 +239,12 @@ var appRouter = function (app) {
       else
         console.log("Nothing to Power Up!");
       steemPlusPay= await steem.api.getAccountsAsync(['steemplus-pay']);
-      if(steemPlusPay[0].sbd_balance!="0.000 SBD"){
+      if(parseFloat(steemPlusPay[0].sbd_balance.split(" ")[0])>=10){
         await steem.broadcast.convertAsync(config.payActKey, 'steemplus-pay', parseInt(utils.generateRandomString(7)), steemPlusPay[0].sbd_balance);
         console.log("Starting conversion of "+steemPlusPay[0].sbd_balance);
       }
       else
-        console.log("No SBD to convert!");
+        console.log("Not enough SBD to convert! ("+steemPlusPay[0].sbd_balance+")");
       const globalProperties = await steem.api.getDynamicGlobalPropertiesAsync();
       const totalSteem = Number(globalProperties.total_vesting_fund_steem.split(' ')[0]);
       const totalVests = Number(globalProperties.total_vesting_shares.split(' ')[0]);
@@ -621,7 +621,7 @@ var appRouter = function (app) {
   });
 }
 
-// Function used to get statistics about SPP : 
+// Function used to get statistics about SPP :
 // - Total amount delivered
 // - Total per user
 // - Total per categories
@@ -657,7 +657,7 @@ async function getSppStats(){
       "$group":
       {
         "_id" : "$typeTransaction",
-        "points": 
+        "points":
         {
           "$sum": "$nbPoints"
         }
@@ -697,7 +697,7 @@ async function payDelegations(historyDelegations){
     // ... And add values
     delegations[delegation.delegator].push({
       "vesting_shares": delegation.vesting_shares,
-      "timestamp": delegation.timestamp 
+      "timestamp": delegation.timestamp
     });
     // Sort delegations from the oldest to the most recent
     delegations[delegation.delegator].sort(function(a, b){return a.timestamp-b.timestamp});
@@ -706,7 +706,7 @@ async function payDelegations(historyDelegations){
   let payments = [];
   let dateStartSPP = new Date('2017-08-03 12:05:42.000');
   let dateNow = new Date();
-  
+
   // For each delegator
   for(delegator of delegators) {
     let startDate = null;
@@ -727,7 +727,7 @@ async function payDelegations(historyDelegations){
       if(dateFirstDelegation <= dateStartSPP)
         startDate = dateStartSPP;
       else
-        startDate = dateFirstDelegation;  
+        startDate = dateFirstDelegation;
     }
     let date = startDate;
     let countDays = 0;
@@ -742,7 +742,7 @@ async function payDelegations(historyDelegations){
       currentDelegation = previousDelegation;
       let tmp = delegations[delegator].filter(d => new Date(d.timestamp) <= date).sort(function(a, b){return b.timestamp-a.timestamp});
       if(tmp !== currentDelegation) currentDelegation = tmp[0].vesting_shares;
-    } 
+    }
     else
       currentDelegation = currentDelegation.vesting_shares;
 
@@ -758,17 +758,17 @@ async function payDelegations(historyDelegations){
         // Look for minimum delegation of the last 24 hours not last one
         previousDelegation = currentDelegation;
         currentDelegation = delegations[delegator].filter(d => (new Date(d.timestamp) <= date && new Date(d.timestamp) > previousDate) ).sort(function(a, b){return a.vesting_shares-b.vesting_shares})[0];
-        
+
         // Same behavior as during the init part
         if(currentDelegation === undefined)
         {
           currentDelegation = previousDelegation;
           let tmp = delegations[delegator].filter(d => new Date(d.timestamp) <= date).sort(function(a, b){return b.timestamp-a.timestamp});
           if(tmp !== currentDelegation) currentDelegation = tmp[0].vesting_shares;
-        } 
+        }
         else
           currentDelegation = currentDelegation.vesting_shares;
-        
+
         // If currentDelegation is undefined or 0, this means user stopped delegating.
         if(currentDelegation === 0 || currentDelegation === undefined){
           hasCanceledDelegation = true;
