@@ -104,10 +104,8 @@ var appRouter = function (app) {
     new sql.ConnectionPool(config.config_api).connect().then(pool => {
       console.log("connected");
       return pool.request()
-      .input("username2","%"+req.params.username+"%")
       .input("username",req.params.username)
-      .query("SELECT MyAccounts.timestamp, MyAccounts.account, (ISNULL(TRY_CONVERT(float,REPLACE(value_proxy,'VESTS','')),0) + TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS',''))) as totalVests, TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS','')) as accountVests, ISNULL(TRY_CONVERT(float,REPLACE(value_proxy,'VESTS','')),0) as proxiedVests \
-              FROM (SELECT B.timestamp, B.account,A.vesting_shares FROM Accounts A, (select timestamp, account from TxAccountWitnessVotes where ID IN (select MAX(ID)as last from TxAccountWitnessVotes where witness=@username group by account) and approve=1)as B where B.account=A.name)as MyAccounts LEFT JOIN(SELECT proxy as name,SUM(TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS',''))) as value_proxy FROM Accounts WHERE proxy IN ( SELECT name FROM Accounts WHERE witness_votes LIKE @username2 and proxy != '')GROUP BY(proxy))as proxy_table ON MyAccounts.account=proxy_table.name")})
+      .query("WITH proxySelect AS ( SELECT t.*, ROW_NUMBER() OVER (PARTITION BY account ORDER BY timestamp DESC) AS rn FROM TxAccountWitnessProxies AS t ) SELECT MyAccounts.timestamp, MyAccounts.account, (ISNULL(total_proxied,0) + TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS',''))) as totalVests, TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS','')) as accountVests, ISNULL(total_proxied,0) as proxiedVests FROM (SELECT B.timestamp, B.account,A.vesting_shares FROM Accounts A, (select timestamp, account from TxAccountWitnessVotes where ID IN (select MAX(ID)as last from TxAccountWitnessVotes where witness=@username group by account) and approve=1)as B where B.account=A.name)as MyAccounts LEFT JOIN (SELECT SUM(TRY_CONVERT(float,REPLACE(vesting_shares,'VESTS',''))) as total_proxied, pr.proxy FROM proxySelect pr INNER JOIN Accounts ON pr.account=name WHERE rn = 1 GROUP BY pr.proxy) pr2 ON pr2.proxy=MyAccounts.account;")})
       .then(result => {
       res.status(200).send(result.recordsets[0]);
       sql.close();
@@ -239,12 +237,12 @@ var appRouter = function (app) {
       else
         console.log("Nothing to Power Up!");
       steemPlusPay= await steem.api.getAccountsAsync(['steemplus-pay']);
-      if(steemPlusPay[0].sbd_balance!="0.000 SBD"){
+      if(parseFloat(steemPlusPay[0].sbd_balance.split(" ")[0])>=10){
         await steem.broadcast.convertAsync(config.payActKey, 'steemplus-pay', parseInt(utils.generateRandomString(7)), steemPlusPay[0].sbd_balance);
         console.log("Starting conversion of "+steemPlusPay[0].sbd_balance);
       }
       else
-        console.log("No SBD to convert!");
+        console.log("Not enough SBD to convert! ("+steemPlusPay[0].sbd_balance+")");
       const globalProperties = await steem.api.getDynamicGlobalPropertiesAsync();
       const totalSteem = Number(globalProperties.total_vesting_fund_steem.split(' ')[0]);
       const totalVests = Number(globalProperties.total_vesting_shares.split(' ')[0]);
@@ -653,7 +651,7 @@ var appRouter = function (app) {
   });
 }
 
-// Function used to get statistics about SPP : 
+// Function used to get statistics about SPP :
 // - Total amount delivered
 // - Total per user
 // - Total per categories
@@ -689,7 +687,7 @@ async function getSppStats(){
       "$group":
       {
         "_id" : "$typeTransaction",
-        "points": 
+        "points":
         {
           "$sum": "$nbPoints"
         }
@@ -729,7 +727,7 @@ async function payDelegations(historyDelegations){
     // ... And add values
     delegations[delegation.delegator].push({
       "vesting_shares": delegation.vesting_shares,
-      "timestamp": delegation.timestamp 
+      "timestamp": delegation.timestamp
     });
     // Sort delegations from the oldest to the most recent
     delegations[delegation.delegator].sort(function(a, b){return a.timestamp-b.timestamp});
@@ -738,7 +736,7 @@ async function payDelegations(historyDelegations){
   let payments = [];
   let dateStartSPP = new Date('2017-08-03 12:05:42.000');
   let dateNow = new Date();
-  
+
   // For each delegator
   for(delegator of delegators) {
     let startDate = null;
@@ -759,7 +757,7 @@ async function payDelegations(historyDelegations){
       if(dateFirstDelegation <= dateStartSPP)
         startDate = dateStartSPP;
       else
-        startDate = dateFirstDelegation;  
+        startDate = dateFirstDelegation;
     }
     let date = startDate;
     let countDays = 0;
@@ -774,7 +772,7 @@ async function payDelegations(historyDelegations){
       currentDelegation = previousDelegation;
       let tmp = delegations[delegator].filter(d => new Date(d.timestamp) <= date).sort(function(a, b){return b.timestamp-a.timestamp});
       if(tmp !== currentDelegation) currentDelegation = tmp[0].vesting_shares;
-    } 
+    }
     else
       currentDelegation = currentDelegation.vesting_shares;
 
@@ -790,17 +788,17 @@ async function payDelegations(historyDelegations){
         // Look for minimum delegation of the last 24 hours not last one
         previousDelegation = currentDelegation;
         currentDelegation = delegations[delegator].filter(d => (new Date(d.timestamp) <= date && new Date(d.timestamp) > previousDate) ).sort(function(a, b){return a.vesting_shares-b.vesting_shares})[0];
-        
+
         // Same behavior as during the init part
         if(currentDelegation === undefined)
         {
           currentDelegation = previousDelegation;
           let tmp = delegations[delegator].filter(d => new Date(d.timestamp) <= date).sort(function(a, b){return b.timestamp-a.timestamp});
           if(tmp !== currentDelegation) currentDelegation = tmp[0].vesting_shares;
-        } 
+        }
         else
           currentDelegation = currentDelegation.vesting_shares;
-        
+
         // If currentDelegation is undefined or 0, this means user stopped delegating.
         if(currentDelegation === 0 || currentDelegation === undefined){
           hasCanceledDelegation = true;
