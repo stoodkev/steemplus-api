@@ -10,7 +10,7 @@ exports.getReblogs = (author, permlink) => {
         .input("author", author)
         .input("permlink", permlink)
         .query(
-          `SELECT account, author, permlink FROM Reblogs WHERE author=@author AND permlink=@permlink`
+          `SELECT account FROM Reblogs WHERE author=@author AND permlink=@permlink`
         );
     })
     .then(result => {
