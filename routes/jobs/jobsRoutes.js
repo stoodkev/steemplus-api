@@ -1,7 +1,7 @@
 const config = require("../../config.js");
 const spp = require("../../controllers/jobs/spp.js");
 const vote = require("../../controllers/jobs/vote.js");
-const blockchain = require("../../controllers/jobs/blockchain.js");
+const steemplusPay = require("../../controllers/jobs/steemplusPay.js");
 const utils = require("../../utils.js");
 const steem = require("steem");
 
@@ -18,12 +18,12 @@ const jobRoutes = function(app) {
     res.status(200).send("OK");
   });
 
-  app.get("/job/power/:key", async function(req, res) {
+  app.get("/job/grow/:key", async function(req, res) {
     if (req.params.key !== config.key) {
       res.status(403).send("Permission denied");
       return;
     }
-    blockchain.power();
+    steemplusPay.grow();
     res.status(200).send("OK");
   });
 
