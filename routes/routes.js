@@ -237,12 +237,12 @@ var appRouter = function (app) {
       else
         console.log("Nothing to Power Up!");
       steemPlusPay= await steem.api.getAccountsAsync(['steemplus-pay']);
-      if(parseFloat(steemPlusPay[0].sbd_balance.split(" ")[0])>=10){
+      /*if(parseFloat(steemPlusPay[0].sbd_balance.split(" ")[0])>=10){
         await steem.broadcast.convertAsync(config.payActKey, 'steemplus-pay', parseInt(utils.generateRandomString(7)), steemPlusPay[0].sbd_balance);
         console.log("Starting conversion of "+steemPlusPay[0].sbd_balance);
       }
       else
-        console.log("Not enough SBD to convert! ("+steemPlusPay[0].sbd_balance+")");
+        console.log("Not enough SBD to convert! ("+steemPlusPay[0].sbd_balance+")");*/
       const globalProperties = await steem.api.getDynamicGlobalPropertiesAsync();
       const totalSteem = Number(globalProperties.total_vesting_fund_steem.split(' ')[0]);
       const totalVests = Number(globalProperties.total_vesting_shares.split(' ')[0]);
