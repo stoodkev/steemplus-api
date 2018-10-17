@@ -1260,7 +1260,7 @@ async function updateSteemplusPointsComments(comments)
 
     // Get type
     var type = 'default';
-    if(comment.beneficiaries.includes('dtube.rewards'))
+    if(comment.beneficiaries.includes('dtube.rewards')||comment.beneficiaries.includes('dtube'))
       type = await TypeTransaction.findOne({name: 'DTube'});
     else if(comment.beneficiaries.includes('utopian.pay'))
       type = await TypeTransaction.findOne({name: 'Utopian.io'});
