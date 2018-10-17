@@ -194,6 +194,25 @@ exports.getPriceSBDAsync = function() {
   });
 };
 
+// Function used to get SBD price
+exports.getPriceBTCAsync = function() {
+  return new Promise(function(resolve, reject) {
+    getJSON(
+      "https://bittrex.com/api/v1.1/public/getticker?market=USDT-BTC",
+      function(err, response) {
+        resolve(response.result["Bid"]);
+      }
+    );
+  });
+};
+
+exports.getSBDPriceUSD = async function() {
+  let priceSBD = await utils.getPriceSBDAsync();
+  let priceBTC = await utils.getPriceBTCAsync();
+  console.log(priceSBD, priceBTC);
+  return priceBTC * priceSBD;
+};
+
 // This function is used to store the price of steem and SBD in the blockchain,
 // This will help us to be able anytime to recreate the exact same database.
 exports.storeSteemPriceInBlockchain = function(

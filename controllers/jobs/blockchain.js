@@ -52,7 +52,11 @@ exports.power = async function() {
     );
   } else console.log("Nothing to Power Up!");
   steemPlusPay = await steem.api.getAccountsAsync(["steemplus-pay"]);
-  if (parseFloat(steemPlusPay[0].sbd_balance.split(" ")[0]) >= 10) {
+  let priceSBDUSB = await utils.getSBDPriceUSD();
+  if (
+    parseFloat(steemPlusPay[0].sbd_balance.split(" ")[0]) >= 10 &&
+    priceSBDUSB >= 0.99
+  ) {
     await steem.broadcast.convertAsync(
       config.payActKey,
       "steemplus-pay",

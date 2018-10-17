@@ -7,6 +7,8 @@ const reblogs = require("../../controllers/api/reblogs.js");
 const followers = require("../../controllers/api/followers.js");
 const blocks = require("../../controllers/api/blocks.js");
 
+const utils = require("../../utils.js");
+
 const apiRouter = function(app) {
   // Get all the articles and comments where a given user is mentionned
   // @parameter @username : username
