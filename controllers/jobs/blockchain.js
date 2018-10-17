@@ -1,6 +1,6 @@
-let steem = require("steem");
-let config = require("../../config.js");
-let utils = require("../../utils.js");
+const steem = require("steem");
+const config = require("../../config.js");
+const utils = require("../../utils.js");
 
 exports.power = async function() {
   let steemPlusPay = await steem.api.getAccountsAsync(["steemplus-pay"]);
@@ -85,40 +85,4 @@ exports.power = async function() {
     delegated_vest
   );
   console.log("Increased delegation to " + delegated_SP + " SP!");
-};
-
-// This function is used to store the price of steem and SBD in the blockchain,
-// This will help us to be able anytime to recreate the exact same database.
-exports.storeSteemPriceInBlockchain = function(
-  priceSteem,
-  priceSBD,
-  totalSteem,
-  totalVests
-) {
-  getJSON(
-    "https://bittrex.com/api/v1.1/public/getticker?market=BTC-SBD",
-    function(err, response) {
-      const accountName = "steemplus-bot";
-      const json = JSON.stringify({
-        priceHistory: {
-          priceSteem: priceSteem,
-          priceSBD: priceSBD,
-          priceBTC: response.result["Bid"],
-          totalSteem: totalSteem,
-          totalVests: totalVests
-        }
-      });
-
-      steem.broadcast.transfer(
-        config.wif_bot || process.env.WIF_TEST_2,
-        accountName,
-        accountName,
-        "0.001 SBD",
-        json,
-        function(err, result) {
-          console.log(err, result);
-        }
-      );
-    }
-  );
 };

@@ -9,14 +9,14 @@ exports.getIncoming = username => {
         .request()
         .input("username", username)
         .query(
-          "SELECT delegator, vesting_shares, timestamp as delegation_date \
-            FROM TxDelegateVestingShares \
-            INNER JOIN ( \
-              SELECT MAX(ID) as last_delegation_id \
-              FROM TxDelegateVestingShares \
-              WHERE delegatee = @username \
-              GROUP BY delegator \
-            ) AS Data ON TxDelegateVestingShares.ID = Data.last_delegation_id"
+          `SELECT delegator, vesting_shares, timestamp as delegation_date 
+            FROM TxDelegateVestingShares 
+            INNER JOIN ( 
+              SELECT MAX(ID) as last_delegation_id 
+              FROM TxDelegateVestingShares 
+              WHERE delegatee = @username 
+              GROUP BY delegator 
+            ) AS Data ON TxDelegateVestingShares.ID = Data.last_delegation_id`
         );
     })
     .then(result => {

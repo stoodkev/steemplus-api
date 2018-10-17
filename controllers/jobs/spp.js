@@ -1,11 +1,15 @@
-let config = require("../../config.js");
-let sql = require("mssql");
-let steem = require("steem");
-let utils = require("../../utils.js");
-var User = require("../../models/user.js");
-var PointsDetail = require("../../models/pointsDetail.js");
-var TypeTransaction = require("../../models/typeTransaction.js");
+const config = require("../../config.js");
+const sql = require("mssql");
+const steem = require("steem");
+const utils = require("../../utils.js");
+const User = require("../../models/user.js");
+const PointsDetail = require("../../models/pointsDetail.js");
+const TypeTransaction = require("../../models/typeTransaction.js");
 
+let priceHistory;
+let currentRatioSBDSteem = null;
+let currentTotalSteem = null;
+let currentTotalVests = null;
 // Function used to add a given number of days
 function addDays(date, days) {
   var result = new Date(date);
@@ -191,7 +195,13 @@ exports.payDelegations = async function() {
         date = addDays(date, 1);
         previousDate = subDays(date, 1);
         // Retrive price informations
-        let jsonPrice = utils.findSteemplusPrice(date, priceHistory);
+        let jsonPrice = utils.findSteemplusPrice(
+          date,
+          priceHistory,
+          currentRatioSBDSteem,
+          currentTotalSteem,
+          currentTotalVests
+        );
         let totalSteem = jsonPrice.totalSteem;
         let totalVests = jsonPrice.totalVests;
         let ratioSBDSteem = jsonPrice.price;
@@ -274,7 +284,13 @@ async function updateSteemplusPointsComments(comments) {
       else type = await TypeTransaction.findOne({ name: "Donation" });
     }
 
-    var jsonPrice = findSteemplusPrice(comment.created);
+    var jsonPrice = utils.findSteemplusPrice(
+      comment.created,
+      priceHistory,
+      currentRatioSBDSteem,
+      currentTotalSteem,
+      currentTotalVests
+    );
     var ratioSBDSteem = jsonPrice.price;
     var totalSteem = jsonPrice.totalSteem;
     var totalVests = jsonPrice.totalVests;
@@ -475,7 +491,13 @@ async function updateSteemplusPointsTransfers(transfers) {
         user = await user.save();
       }
 
-      var ratioSBDSteem = findSteemplusPrice(transfer.timestamp).price;
+      var ratioSBDSteem = utils.findSteemplusPrice(
+        transfer.timestamp,
+        priceHistory,
+        currentRatioSBDSteem,
+        currentTotalSteem,
+        currentTotalVests
+      ).price;
       // We decided that 1SPP == 0.01 SBD
       var nbPoints = 0;
       if (transfer.amount_symbol === "SBD") nbPoints = amount * 100;
@@ -560,9 +582,9 @@ exports.updateSteemplusPoints = function() {
     // Get dynamic properties of steem to be able to calculate prices
     Promise.all([
       steem.api.getDynamicGlobalPropertiesAsync(),
-      getPriceSBDAsync(),
-      getPriceSteemAsync(),
-      getLastBlockID()
+      utils.getPriceSBDAsync(),
+      utils.getPriceSteemAsync(),
+      utils.getLastBlockID()
     ]).then(async function(values) {
       currentTotalSteem = Number(
         values["0"].total_vesting_fund_steem.split(" ")[0]
@@ -573,7 +595,7 @@ exports.updateSteemplusPoints = function() {
 
       // Calculate ration SBD/Steem
       currentRatioSBDSteem = values[2] / values[1];
-      storeSteemPriceInBlockchain(
+      utils.storeSteemPriceInBlockchain(
         values[2],
         values[1],
         currentTotalSteem,
@@ -636,10 +658,8 @@ exports.updateSteemplusPoints = function() {
           `);
         })
         .then(result => {
-          // get result
-          var comments = result.recordsets[0];
           // Start data processing
-          updateSteemplusPointsComments(comments);
+          updateSteemplusPointsComments(result.recordsets[0]);
           sql.close();
         })
         .catch(error => {
@@ -697,8 +717,7 @@ exports.updateSteemplusPoints = function() {
         `);
         })
         .then(result => {
-          var transfers = result.recordsets[0];
-          updateSteemplusPointsTransfers(transfers);
+          updateSteemplusPointsTransfers(result.recordsets[0]);
           sql.close();
         })
         .catch(error => {
@@ -733,10 +752,8 @@ exports.updateSteemplusPoints = function() {
         `);
         })
         .then(result => {
-          // get result
-          var reblogs = result.recordsets[0];
           // Start data processing
-          updateSteemplusPointsReblogs(reblogs);
+          updateSteemplusPointsReblogs(result.recordsets[0]);
           sql.close();
         })
         .catch(error => {

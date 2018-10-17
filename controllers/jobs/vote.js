@@ -1,6 +1,11 @@
-const User = require("../models/user");
-const LastVote = require("../models/lastVote");
-const votingAccount = "steem-plus";
+const User = require("../../models/user.js");
+const LastVote = require("../../models/lastVote.js");
+const utils = require("../../utils.js");
+const config = require("../../config.js");
+const sql = require("mssql");
+const steem = require("steem");
+
+const VOTING_ACCOUNT = "steem-plus";
 const MAX_VOTING_PERCENTAGE = 10000;
 const MAX_PERCENTAGE = 11000;
 
@@ -58,7 +63,7 @@ async function votingRoutine(spAccount, postsBeforeProcess) {
     );
     var alreadyVoted = false;
     for (let vote of votesList) {
-      if (vote.voter === votingAccount && vote.weight !== 0) {
+      if (vote.voter === VOTING_ACCOUNT && vote.weight !== 0) {
         console.log("Already voted : ", postsBeforeProcess[i]);
         alreadyVoted = true;
         break;
@@ -143,7 +148,7 @@ async function votingRoutine(spAccount, postsBeforeProcess) {
           );
           steem.broadcast.vote(
             config.wif,
-            votingAccount,
+            VOTING_ACCOUNT,
             post.author,
             post.permlink,
             post.percentage,
@@ -172,7 +177,7 @@ async function votingRoutine(spAccount, postsBeforeProcess) {
                   config.wif,
                   post.author,
                   post.permlink,
-                  votingAccount,
+                  VOTING_ACCOUNT,
                   post.permlink + "---vote-steemplus",
                   "SteemPlus upvote",
                   utils.commentVotingBot(post),
@@ -214,44 +219,50 @@ async function votingRoutine(spAccount, postsBeforeProcess) {
   }
 }
 
-exports.startBotVote = function(spAccount) {
-  LastVote.findOne({}, function(err, lastVote) {
-    let dateVote =
-      lastVote === null
-        ? "DATEADD(hour,-24, GETUTCDATE())"
-        : `'${lastVote.date}'`;
-    // Get a list with those names
-    let usernameList = [];
-    users.map(user => usernameList.push(`'${user.accountName}'`));
-    // Execute a SQL query that get the last article from all those users if their last article has been posted
-    // less than 24h ago
-    new sql.ConnectionPool(config.config_api)
-      .connect()
-      .then(pool => {
-        return pool.request().query(`
-      SELECT permlink, title, Comments.author, url, created
-      FROM Comments
-      INNER JOIN
-      (
-        SELECT author, max(created) as maxDate
-        FROM Comments
-        WHERE depth = 0
-        AND author IN (${usernameList.join(",")})
-        AND created > ${dateVote}
-        GROUP BY author
-      ) t
-      ON Comments.author = t.author
-      AND created = t.maxDate;
-      `);
-      })
-      .then(result => {
-        var posts = result.recordsets[0];
-        votingRoutine(spAccount, posts);
-        sql.close();
-      })
-      .catch(error => {
-        console.log(error);
-        sql.close();
+exports.startBotVote = function(spAccount, users) {
+  // Find all the accounts names that has more than 0 points
+  User.find({ nbPoints: { $gt: 0 } }, "accountName", function(err, users) {
+    if (err) console.log(`Error while getting users : ${err}`);
+    else {
+      LastVote.findOne({}, function(err, lastVote) {
+        let dateVote =
+          lastVote === null
+            ? "DATEADD(hour,-24, GETUTCDATE())"
+            : `'${lastVote.date}'`;
+        // Get a list with those names
+        let usernameList = [];
+        users.map(user => usernameList.push(`'${user.accountName}'`));
+        // Execute a SQL query that get the last article from all those users if their last article has been posted
+        // less than 24h ago
+        new sql.ConnectionPool(config.config_api)
+          .connect()
+          .then(pool => {
+            return pool.request().query(`
+          SELECT permlink, title, Comments.author, url, created
+          FROM Comments
+          INNER JOIN
+          (
+            SELECT author, max(created) as maxDate
+            FROM Comments
+            WHERE depth = 0
+            AND author IN (${usernameList.join(",")})
+            AND created > ${dateVote}
+            GROUP BY author
+          ) t
+          ON Comments.author = t.author
+          AND created = t.maxDate;
+          `);
+          })
+          .then(result => {
+            var posts = result.recordsets[0];
+            votingRoutine(spAccount, posts);
+            sql.close();
+          })
+          .catch(error => {
+            console.log(error);
+            sql.close();
+          });
       });
+    }
   });
 };

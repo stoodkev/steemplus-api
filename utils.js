@@ -1,6 +1,8 @@
 const utils = require("./utils");
 const sql = require("mssql");
 const getJSON = require("get-json");
+const steem = require("steem");
+const config = require("./config.js");
 
 exports.commentNewUser = function(post, lastUpdate, numUsers) {
   let commentBody = `#### Welcome to Steem, @${post.author}!\n\n`;
@@ -80,7 +82,13 @@ exports.generateRandomString = function(size) {
 };
 
 // Get price for a chosen date
-exports.findSteemplusPrice = function(date, priceHistory) {
+exports.findSteemplusPrice = function(
+  date,
+  priceHistory,
+  currentRatioSBDSteem,
+  currentTotalSteem,
+  currentTotalVests
+) {
   let dateNow = new Date();
   let minuteNow = dateNow.getUTCMinutes() - (dateNow.getUTCMinutes() % 10);
   let periodNow = `${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth() +
@@ -184,4 +192,40 @@ exports.getPriceSBDAsync = function() {
       }
     );
   });
+};
+
+// This function is used to store the price of steem and SBD in the blockchain,
+// This will help us to be able anytime to recreate the exact same database.
+exports.storeSteemPriceInBlockchain = function(
+  priceSteem,
+  priceSBD,
+  totalSteem,
+  totalVests
+) {
+  getJSON(
+    "https://bittrex.com/api/v1.1/public/getticker?market=BTC-SBD",
+    function(err, response) {
+      const accountName = "steemplus-bot";
+      const json = JSON.stringify({
+        priceHistory: {
+          priceSteem: priceSteem,
+          priceSBD: priceSBD,
+          priceBTC: response.result["Bid"],
+          totalSteem: totalSteem,
+          totalVests: totalVests
+        }
+      });
+
+      steem.broadcast.transfer(
+        config.wif_bot || process.env.WIF_TEST_2,
+        accountName,
+        accountName,
+        "0.001 SBD",
+        json,
+        function(err, result) {
+          console.log(err, result);
+        }
+      );
+    }
+  );
 };

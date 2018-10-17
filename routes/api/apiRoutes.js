@@ -1,6 +1,3 @@
-const config = require("../../config.js");
-const sql = require("mssql");
-
 const mentions = require("../../controllers/api/mentions.js");
 const witnesses = require("../../controllers/api/witnesses.js");
 const delegations = require("../../controllers/api/delegations.js");

@@ -1,7 +1,11 @@
 const config = require("../../config.js");
-const steem = require("steem");
 const spp = require("../../controllers/jobs/spp.js");
+const vote = require("../../controllers/jobs/vote.js");
 const blockchain = require("../../controllers/jobs/blockchain.js");
+const utils = require("../../utils.js");
+const steem = require("steem");
+
+const VOTING_ACCOUNT = "steem-plus";
 
 const jobRoutes = function(app) {
   // Method used to give user rewards depending on delegations
@@ -26,12 +30,13 @@ const jobRoutes = function(app) {
   // This function is used to update steemplus point.
   // Function executed every hour.
   // Only get the results since the last entry.
-  app.get("/job/update-steemplus-points/:key", function(req, res) {
+  app.get("/job/update-steemplus-points/:key", async function(req, res) {
     // If key is not the right key, permission denied and return
     if (req.params.key !== config.key) {
       res.status(403).send("Permission denied");
       return;
     }
+    spp.updateSteemplusPoints();
     res.status(200).send("OK");
   });
 
@@ -42,7 +47,7 @@ const jobRoutes = function(app) {
       return;
     }
     // get Steem-plus voting power
-    steem.api.getAccounts([votingAccount], function(err, result) {
+    steem.api.getAccounts([VOTING_ACCOUNT], function(err, result) {
       if (err) console.log(err);
       else {
         let spAccount = result[0];
@@ -53,17 +58,8 @@ const jobRoutes = function(app) {
           process.env.CAN_VOTE === "true"
         ) {
           console.log("start voting...");
-          // Find all the accounts names that has more than 0 points
-          User.find({ nbPoints: { $gt: 0 } }, "accountName", function(
-            err,
-            users
-          ) {
-            if (err) console.log(`Error while getting users : ${err}`);
-            else {
-              vote.startBotVote(spAccount);
-              res.status(200).send("OK");
-            }
-          });
+          vote.startBotVote(spAccount);
+          res.status(200).send("OK");
         } else {
           if (process.env.CAN_VOTE === "false") {
             console.log("Voting bot disabled...");
