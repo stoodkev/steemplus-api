@@ -1,8 +1,14 @@
-var mongoose = require('mongoose');
-var Schema = mongoose.Schema;
+const mongoose = require("mongoose");
+const Schema = mongoose.Schema;
 
-var LastVote = mongoose.model("LastVote", new mongoose.Schema({
-  date : String
-},{ collection : 'lastvote' }));
+const LastVote = mongoose.model(
+  "LastVote",
+  new Schema(
+    {
+      date: String
+    },
+    { collection: "lastvote" }
+  )
+);
 
 module.exports = LastVote;

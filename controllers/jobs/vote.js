@@ -55,13 +55,13 @@ async function votingRoutine(spAccount, postsBeforeProcess) {
     console.log("No new post to vote! End!");
     return;
   }
-  var posts = [];
+  let posts = [];
   for (let i = 0; i < postsBeforeProcess.length; i++) {
     let votesList = await steem.api.getActiveVotesAsync(
       postsBeforeProcess[i].author,
       postsBeforeProcess[i].permlink
     );
-    var alreadyVoted = false;
+    let alreadyVoted = false;
     for (let vote of votesList) {
       if (vote.voter === VOTING_ACCOUNT && vote.weight !== 0) {
         console.log("Already voted : ", postsBeforeProcess[i]);
@@ -100,14 +100,14 @@ async function votingRoutine(spAccount, postsBeforeProcess) {
     return b.nbPoints - a.nbPoints;
   });
 
-  var nbPostsSent = -1;
+  let nbPostsSent = -1;
   // Start voting
   console.log(`Will try to vote for ${posts.length} post(s)`);
 
   // Delete post with percent equals 0
   let postsToVote = posts.filter(p => p.percentage > 0);
 
-  var vm = 1;
+  let vm = 1;
   for (let post of postsToVote) {
     console.log(post);
     vm = vm - (vm * 0.02 * post.percentage) / 10000.0;
@@ -131,8 +131,9 @@ async function votingRoutine(spAccount, postsBeforeProcess) {
               return new Date(b.created) - new Date(a.created);
             });
             LastVote.findOne({}, function(err, lastVote) {
+              let lastVote;
               if (lastVote === null)
-                var lastVote = new LastVote({
+                lastVote = new LastVote({
                   date: utils.formatDate(posts[0].created)
                 });
               else lastVote.date = utils.formatDate(posts[0].created);
@@ -196,8 +197,9 @@ async function votingRoutine(spAccount, postsBeforeProcess) {
                           return new Date(b.created) - new Date(a.created);
                         });
                         LastVote.findOne({}, function(err, lastVote) {
+                          let lastVote;
                           if (lastVote === null)
-                            var lastVote = new LastVote({
+                            lastVote = new LastVote({
                               date: utils.formatDate(posts[0].created)
                             });
                           else
@@ -254,8 +256,7 @@ exports.startBotVote = function(spAccount, users) {
           `);
           })
           .then(result => {
-            var posts = result.recordsets[0];
-            votingRoutine(spAccount, posts);
+            votingRoutine(spAccount, result.recordsets[0]);
             sql.close();
           })
           .catch(error => {

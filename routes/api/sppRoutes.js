@@ -1,4 +1,6 @@
-var sppRouter = function(app) {
+const spp = require("../../controllers/api/spp.js");
+
+const sppRouter = function(app) {
   // Function used to get the details of an account.
   // @parameter username : account name
   // Return the number of points of an account and other information as the detail of every entry of steemplus point

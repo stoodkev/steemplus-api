@@ -65,7 +65,7 @@ exports.getMana = function(account) {
 };
 
 exports.getEffectiveVestingSharesPerAccount = function(account) {
-  var effective_vesting_shares =
+  let effective_vesting_shares =
     parseFloat(account.vesting_shares.replace(" VESTS", "")) +
     parseFloat(account.received_vesting_shares.replace(" VESTS", "")) -
     parseFloat(account.delegated_vesting_shares.replace(" VESTS", ""));
@@ -74,9 +74,9 @@ exports.getEffectiveVestingSharesPerAccount = function(account) {
 
 // generate a n characters random string
 exports.generateRandomString = function(size) {
-  var text = "";
-  var possible = "0123456789";
-  for (var i = 0; i < size; i++)
+  let text = "";
+  const possible = "0123456789";
+  for (let i = 0; i < size; i++)
     text += possible.charAt(Math.floor(Math.random() * possible.length));
   return text;
 };

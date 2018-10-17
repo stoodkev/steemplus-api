@@ -12,14 +12,14 @@ let currentTotalSteem = null;
 let currentTotalVests = null;
 // Function used to add a given number of days
 function addDays(date, days) {
-  var result = new Date(date);
+  let result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
 }
 
 // FUnction used to substract a given number of days
 function subDays(date, days) {
-  var result = new Date(date);
+  let result = new Date(date);
   result.setDate(result.getDate() - days);
   return result;
 }
@@ -227,7 +227,7 @@ exports.payDelegations = async function() {
 
         let nbPoints = weekly / 7.0;
         // Create new PointsDetail entry
-        var pointsDetail = new PointsDetail({
+        let pointsDetail = new PointsDetail({
           nbPoints: nbPoints,
           amount: nbPoints,
           amountSymbol: "SP",
@@ -258,12 +258,12 @@ exports.payDelegations = async function() {
 // @parameter totalVests : dynamic value from the blockchain
 async function updateSteemplusPointsComments(comments) {
   // Number of new entry in the DB
-  var nbPointDetailsAdded = 0;
+  let nbPointDetailsAdded = 0;
   console.log(`Adding ${comments.length} new comment(s) to DB`);
   // Iterate on transfers
   for (const comment of comments) {
     // Check if user is already in DB
-    var user = await User.findOne({ accountName: comment.author });
+    let user = await User.findOne({ accountName: comment.author });
     if (user === null) {
       // If not create it
       user = new User({ accountName: comment.author, nbPoints: 0 });
@@ -272,31 +272,31 @@ async function updateSteemplusPointsComments(comments) {
     }
 
     // Get type
-    var type = "default";
+    let type = "default";
     if (comment.beneficiaries.includes("dtube.rewards"))
       type = await TypeTransaction.findOne({ name: "DTube" });
     else if (comment.beneficiaries.includes("utopian.pay"))
       type = await TypeTransaction.findOne({ name: "Utopian.io" });
     else {
-      var benefs = JSON.parse(comment.beneficiaries);
+      let benefs = JSON.parse(comment.beneficiaries);
       if (benefs.length > 1)
         type = await TypeTransaction.findOne({ name: "Beneficiaries" });
       else type = await TypeTransaction.findOne({ name: "Donation" });
     }
 
-    var jsonPrice = utils.findSteemplusPrice(
+    let jsonPrice = utils.findSteemplusPrice(
       comment.created,
       priceHistory,
       currentRatioSBDSteem,
       currentTotalSteem,
       currentTotalVests
     );
-    var ratioSBDSteem = jsonPrice.price;
-    var totalSteem = jsonPrice.totalSteem;
-    var totalVests = jsonPrice.totalVests;
+    let ratioSBDSteem = jsonPrice.price;
+    let totalSteem = jsonPrice.totalSteem;
+    let totalVests = jsonPrice.totalVests;
 
     // Get the amount of the transaction
-    var amount = (
+    let amount = (
       (steem.formatter
         .vestToSteem(parseFloat(comment.vesting_payout), totalVests, totalSteem)
         .toFixed(3) +
@@ -305,8 +305,8 @@ async function updateSteemplusPointsComments(comments) {
       parseFloat(comment.sbd_payout)
     ).toFixed(3);
     // Get the number of Steemplus points
-    var nbPoints = amount * 100;
-    var pointsDetail = new PointsDetail({
+    let nbPoints = amount * 100;
+    let pointsDetail = new PointsDetail({
       nbPoints: nbPoints,
       amount: amount,
       amountSymbol: "SP",
@@ -333,7 +333,7 @@ async function updateSteemplusPointsComments(comments) {
 // @parameter transfers : transfers data received from SteemSQL
 async function updateSteemplusPointsTransfers(transfers) {
   // Number of new entry in the DB
-  var nbPointDetailsAdded = 0;
+  let nbPointDetailsAdded = 0;
   let reimbursementList = transfers.filter(
     transfer => transfer.from === "minnowbooster"
   );
@@ -360,24 +360,24 @@ async function updateSteemplusPointsTransfers(transfers) {
     console.log(`Adding ${transfersList.length} new transfer(s) to DB`);
     // Iterate on transfers
     for (const transfer of transfersList) {
-      var reason = null;
+      let reason = null;
       // Init default values
 
-      var permlink = "";
-      var accountName = null;
+      let permlink = "";
+      let accountName = null;
       // Get the amount of the transfer
-      var amount = transfer.amount * 0.01; //Steemplus take 1% of the transaction
+      let amount = transfer.amount * 0.01; //Steemplus take 1% of the transaction
 
-      var requestType = null;
+      let requestType = null;
 
       // Get type
-      var type = null;
+      let type = null;
       if (transfer.to === "minnowbooster") {
         if (transfer.memo.toLowerCase().replace("steemplus") === "") {
           continue;
         }
         type = await TypeTransaction.findOne({ name: "MinnowBooster" });
-        var isReimbursement = false;
+        let isReimbursement = false;
         for (const reimbursement of reimbursementList) {
           if (transfer.from === reimbursement.to) {
             if (
@@ -477,7 +477,7 @@ async function updateSteemplusPointsTransfers(transfers) {
       }
       // Check if user is already in DB
 
-      var user = await User.findOne({ accountName: accountName });
+      let user = await User.findOne({ accountName: accountName });
       if (user === null) {
         // If not, create it
         if (
@@ -491,7 +491,7 @@ async function updateSteemplusPointsTransfers(transfers) {
         user = await user.save();
       }
 
-      var ratioSBDSteem = utils.findSteemplusPrice(
+      let ratioSBDSteem = utils.findSteemplusPrice(
         transfer.timestamp,
         priceHistory,
         currentRatioSBDSteem,
@@ -499,13 +499,13 @@ async function updateSteemplusPointsTransfers(transfers) {
         currentTotalVests
       ).price;
       // We decided that 1SPP == 0.01 SBD
-      var nbPoints = 0;
+      let nbPoints = 0;
       if (transfer.amount_symbol === "SBD") nbPoints = amount * 100;
       else if (transfer.amount_symbol === "STEEM") {
         nbPoints = amount * ratioSBDSteem * 100;
       }
       // Create new PointsDetail entry
-      var pointsDetail = new PointsDetail({
+      let pointsDetail = new PointsDetail({
         nbPoints: nbPoints,
         amount: amount,
         amountSymbol: transfer.amount_symbol,
@@ -532,7 +532,7 @@ async function updateSteemplusPointsTransfers(transfers) {
 // @parameter transfers : transfers data received from SteemSQL
 async function updateSteemplusPointsReblogs(reblogs) {
   // Number of new entry in the DB
-  var nbPointDetailsAdded = 0;
+  let nbPointDetailsAdded = 0;
   console.log(`Adding ${reblogs.length} new reblog(s) to DB`);
   for (reblog of reblogs) {
     let user = await User.findOne({ accountName: reblog.account });
@@ -565,17 +565,6 @@ async function updateSteemplusPointsReblogs(reblogs) {
   }
   console.log(`Added ${nbPointDetailsAdded} pointDetails`);
 }
-
-exports.getSPP = async function(username) {
-  console.log(username);
-  // The populate function helps giving the full information instead of the id of the "typeTransaction" or "pointsDetails"
-  return await User.find({ accountName: username })
-    .populate({
-      path: "pointsDetails",
-      populate: { path: "typeTransaction" }
-    })
-    .exec();
-};
 
 exports.updateSteemplusPoints = function() {
   setTimeout(function() {
@@ -632,11 +621,11 @@ exports.updateSteemplusPoints = function() {
         3;
 
       // Get the last entry the requestType 0 (Comments)
-      var lastEntry = await PointsDetail.find({ requestType: 0 })
+      let lastEntry = await PointsDetail.find({ requestType: 0 })
         .sort({ timestamp: -1 })
         .limit(1);
       // Get the creation date of the last entry
-      var lastEntryDate = null;
+      let lastEntryDate = null;
       if (lastEntry[0] !== undefined)
         lastEntryDate = lastEntry[0].timestampString;
       else lastEntryDate = "2018-08-10 12:05:42.000"; // This date is the steemplus point annoncement day + 7 days for rewards because rewards come after 7 days.
@@ -671,7 +660,7 @@ exports.updateSteemplusPoints = function() {
       lastEntry = await PointsDetail.find({ requestType: 1 })
         .sort({ timestamp: -1 })
         .limit(1);
-      var lastEntryDate = null;
+      lastEntryDate = null;
       if (lastEntry[0] !== undefined)
         lastEntryDate = lastEntry[0].timestampString;
       else lastEntryDate = "2018-08-03 12:05:42.000"; // This date is the steemplus point annoncement day
@@ -680,7 +669,7 @@ exports.updateSteemplusPoints = function() {
       lastEntryMB = await PointsDetail.find({ requestType: 2 })
         .sort({ timestamp: -1 })
         .limit(1);
-      var lastEntryDateMB = null;
+      lastEntryDateMB = null;
       if (lastEntryMB[0] !== undefined)
         lastEntryDateMB = lastEntryMB[0].timestampString;
       else lastEntryDateMB = "2018-08-03 12:05:42.000"; // This date is the steemplus point annoncement day
@@ -726,11 +715,11 @@ exports.updateSteemplusPoints = function() {
         });
 
       // Get the last entry the requestType 4 (Reblogs)
-      var lastEntry = await PointsDetail.find({ requestType: 4 })
+      lastEntry = await PointsDetail.find({ requestType: 4 })
         .sort({ timestamp: -1 })
         .limit(1);
       // Get the creation date of the last entry
-      var lastEntryDate = null;
+      lastEntryDate = null;
       if (lastEntry[0] !== undefined)
         lastEntryDate = lastEntry[0].timestampString;
       else lastEntryDate = "2018-08-03 12:05:42.000"; // This date is the steemplus point annoncement day + 7 days for rewards because rewards come after 7 days.

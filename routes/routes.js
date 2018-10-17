@@ -1,16 +1,8 @@
 const utils = require("../utils");
 const steem = require("steem");
 
-var totalVests = null;
-var totalSteem = null;
-var ratioSBDSteem = null;
-
-var currentRatioSBDSteem = null;
-var currentTotalSteem = null;
-var currentTotalVests = null;
-
-var lastPermlink = null;
-var appRouter = function(app) {
+let lastPermlink = null;
+const appRouter = function(app) {
   app.get("/", function(req, res) {
     res.status(200).send("Welcome to our restful API!");
   });
@@ -19,18 +11,18 @@ var appRouter = function(app) {
 
   app.get("/job/welcome-users/:key", function(req, res) {
     if (req.params.key == config.key) {
-      var query = {
+      const query = {
         tag: "introduceyourself",
         limit: 28
       };
-      var chromeExtensionWebstoreURL =
+      const chromeExtensionWebstoreURL =
         "https://chrome.google.com/webstore/detail/steemplus/mjbkjgcplmaneajhcbegoffkedeankaj?hl=en";
       getJSON(
         "http://www.whateverorigin.org/get?url=" +
           encodeURIComponent(chromeExtensionWebstoreURL),
         function(e, response) {
           //console.log(response);
-          var numUsers = (
+          const numUsers = (
             "" +
             response.contents.match(
               /<Attribute name=\"user_count\">([\d]*?)<\/Attribute>/
@@ -49,7 +41,7 @@ var appRouter = function(app) {
               //console.log(e,r);
               steem.api.getDiscussionsByCreated(query, function(err, results) {
                 console.log(results);
-                var break_point = -1;
+                let break_point = -1;
                 if (err == null && results.length != 0) {
                   results.forEach((result, i) => {
                     if (result.permlink == lastPermlink) {
