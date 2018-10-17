@@ -32,13 +32,13 @@ exports.getWitnessesRank = function() {
   return new sql.ConnectionPool(config.config_api)
     .connect()
     .then(pool => {
-      return pool
-        .request()
-        .query(
-          "SELECT Witnesses.name, rank\
-            FROM Witnesses (NOLOCK)\
-            LEFT JOIN (SELECT ROW_NUMBER() OVER (ORDER BY (SELECT votes) DESC) AS rank, * FROM Witnesses WHERE signing_key != 'STM1111111111111111111111111111111114T1Anm') AS rankedTable ON Witnesses.name = rankedTable.name;"
-        );
+      return pool.request().query(
+        `SELECT Witnesses.name, rank
+          FROM Witnesses
+          RIGHT JOIN (SELECT ROW_NUMBER() OVER (ORDER BY (SELECT votes) DESC) AS rank, * FROM Witnesses WHERE signing_key != 'STM1111111111111111111111111111111114T1Anm') AS rankedTable 
+          ON Witnesses.name = rankedTable.name
+          ORDER BY rank;`
+      );
     })
     .then(result => {
       sql.close();
