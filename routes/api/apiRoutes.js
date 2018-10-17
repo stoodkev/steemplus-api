@@ -34,13 +34,13 @@ const apiRouter = function(app) {
 
   // Get all the incoming delegations for a given user
   // @parameter @username : username
-  app.get("/incoming-delegations/:username", async function(req, res) {
+  app.get("/delegators/:username", async function(req, res) {
     res.status(200).send(await delegations.getIncoming(req.params.username));
   });
 
   // Get all the wallet information for a given user
   // @parameter @username : username
-  app.get("/wallet-content/:username", async function(req, res) {
+  app.get("/wallet/:username", async function(req, res) {
     res.status(200).send(await wallet.getContent(req.params.username));
   });
 
@@ -52,22 +52,23 @@ const apiRouter = function(app) {
 
   //Get all followers / followee for a given user
   //@parameter @username : username
-  app.get("/followers-followee/:username", async function(req, res) {
+  app.get("/follow/:username", async function(req, res) {
     res.status(200).send(await followers.getDetail(req.params.username));
   });
 
   //Get last block id in SteemSQL
-  app.get("/get-last-block-id", async function(req, res) {
+  app.get("/last-block", async function(req, res) {
     res.status(200).send(await blocks.getLastBlockId());
   });
 
   //Get the list of all resteem for a post.
-  // @parameter : list of all the posts we want a list for.
+  // @parameter author : author of the post
+  // @parameter permlink : permlink of the post
   // The post is select by {permlink, author} because permlink can be the same for different authors.
-  app.get("/reblogs/:username/:permlink", async function(req, res) {
+  app.get("/reblogs/:author/:permlink", async function(req, res) {
     res
       .status(200)
-      .send(await reblogs.getReblogs(req.params.username, req.params.permlink));
+      .send(await reblogs.getReblogs(req.params.author, req.params.permlink));
   });
 };
 
