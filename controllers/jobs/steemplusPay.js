@@ -2,7 +2,7 @@ const steem = require("steem");
 const config = require("../../config.js");
 const utils = require("../../utils.js");
 
-exports.power = async function() {
+exports.grow = async function() {
   let steemPlusPay = await steem.api.getAccountsAsync(["steemplus-pay"]);
   if (
     steemPlusPay[0].reward_steem_balance != "0.000 STEEM" ||
