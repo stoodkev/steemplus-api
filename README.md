@@ -42,7 +42,7 @@ Response body
 }
 ```
 
-**GET /witnesses-rank**
+**GET /witnesses-ranks**
 
 _Return witnesses rank (excluding inactive witnesses)._
 
@@ -314,6 +314,13 @@ Response body
     },
     ...
   ],
+  "points_per_user_day": [
+    {
+      "points": "295.868",
+      "name": "dynamicrypto"
+    },
+    ...
+  ],
   "points_per_transaction": [
     {
       "points": "30386.435",
@@ -321,7 +328,16 @@ Response body
     },
     ...
   ],
-  "total_points": "99639.043"
+  "points_per_transaction_day": [
+    {
+      "points": "586.823",
+      "type": "Delegation"
+    },
+    ...
+  ],
+  "total_points_day": "0.000",
+  "total_points": "99639.043",
+  "spp_holders": 499
 }
 ```
 
