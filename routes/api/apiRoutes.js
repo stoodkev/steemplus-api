@@ -24,7 +24,7 @@ const apiRouter = function(app) {
 
   // Get witness ranking. This request doesn't include inactive witnesses
   // No parameter!
-  app.get("/witnesses-rank", async function(req, res) {
+  app.get("/witnesses-ranks", async function(req, res) {
     res.status(200).send(await witnesses.getWitnessesRank());
   });
 
