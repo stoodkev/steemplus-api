@@ -120,7 +120,9 @@ exports.getSppStats = async function() {
   result.points_per_transaction_day = ppt_day;
   const total_day = ppt_day
     .reduce(function(a, b) {
-      return b.type == "Delegation" ? a : a + parseFloat(b.points);
+      return b.type == "Delegation" || b.type == "Reblog"
+        ? a
+        : a + parseFloat(b.points);
     }, 0)
     .toFixed(3);
   result.total_points_day = total_day;
