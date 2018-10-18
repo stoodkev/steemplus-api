@@ -1,8 +1,14 @@
-var mongoose = require('mongoose');
-var Schema = mongoose.Schema;
+const mongoose = require("mongoose");
+const Schema = mongoose.Schema;
 
-var TypeTransaction = mongoose.model("TypeTransaction", new mongoose.Schema({
-  name : String
-}, { collection : 'typetransactions' }));
+const TypeTransaction = mongoose.model(
+  "TypeTransaction",
+  new Schema(
+    {
+      name: String
+    },
+    { collection: "typetransactions" }
+  )
+);
 
-module.exports = TypeTransaction
+module.exports = TypeTransaction;
