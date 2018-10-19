@@ -546,7 +546,8 @@ async function updateSteemplusPointsReblogs(reblogs) {
     }
     let type = await TypeTransaction.findOne({ name: "Reblog" });
     // Create new PointsDetail entry
-    let nbPoints = 20;
+    let limitDate = new Date('2018-10-20 00:00:00.000');
+    let nbPoints = (limitDate > new Date(reblog.timestamp) ? 20 : 5);
     let pointsDetail = new PointsDetail({
       nbPoints: nbPoints,
       amount: nbPoints,
@@ -558,6 +559,7 @@ async function updateSteemplusPointsReblogs(reblogs) {
       timestampString: utils.formatDate(reblog.timestamp),
       requestType: 4
     });
+    console.log(pointsDetail);
     pointsDetail = await pointsDetail.save();
 
     // Update user account
