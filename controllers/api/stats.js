@@ -118,14 +118,19 @@ exports.getSppStats = async function() {
   });
   ppt_day = await Promise.all(ppt_day);
   result.points_per_transaction_day = ppt_day;
-  const total_day = ppt_day
+  const total_day_exclusive = ppt_day
     .reduce(function(a, b) {
-      return b.type == "Delegation" || b.type == "Reblog"
-        ? a
-        : a + parseFloat(b.points);
+      return (b.type == "Delegation"||b.type=="Reblog" )? a : a + parseFloat(b.points);
     }, 0)
     .toFixed(3);
+
+    const total_day = ppt_day
+      .reduce(function(a, b) {
+        return a + parseFloat(b.points);
+      }, 0)
+      .toFixed(3);
   result.total_points_day = total_day;
+  result.total_points_day_exclusive = total_day_exclusive;
   result.total_points = total;
   result.spp_holders = ppu.length;
   //console.log(result);
