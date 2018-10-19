@@ -131,7 +131,6 @@ async function votingRoutine(spAccount, postsBeforeProcess) {
               return new Date(b.created) - new Date(a.created);
             });
             LastVote.findOne({}, function(err, lastVote) {
-              let lastVote;
               if (lastVote === null)
                 lastVote = new LastVote({
                   date: utils.formatDate(posts[0].created)
@@ -197,7 +196,6 @@ async function votingRoutine(spAccount, postsBeforeProcess) {
                           return new Date(b.created) - new Date(a.created);
                         });
                         LastVote.findOne({}, function(err, lastVote) {
-                          let lastVote;
                           if (lastVote === null)
                             lastVote = new LastVote({
                               date: utils.formatDate(posts[0].created)
@@ -227,10 +225,7 @@ exports.startBotVote = function(spAccount, users) {
     if (err) console.log(`Error while getting users : ${err}`);
     else {
       LastVote.findOne({}, function(err, lastVote) {
-        let dateVote =
-          lastVote === null
-            ? "DATEADD(hour,-24, GETUTCDATE())"
-            : `'${lastVote.date}'`;
+        let dateVote = (lastVote === null ? "DATEADD(hour,-24, GETUTCDATE())" : `'${lastVote.date}'`);
         // Get a list with those names
         let usernameList = [];
         users.map(user => usernameList.push(`'${user.accountName}'`));
