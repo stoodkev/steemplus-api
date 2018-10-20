@@ -26,6 +26,7 @@ function subDays(date, days) {
 
 // Function used to credit account for delegations
 exports.payDelegations = async function() {
+  console.log('start paying delegation');
   let historyDelegations = null;
   let priceHistory = null;
 
@@ -546,7 +547,7 @@ async function updateSteemplusPointsReblogs(reblogs) {
     }
     let type = await TypeTransaction.findOne({ name: "Reblog" });
     // Create new PointsDetail entry
-    let limitDate = new Date('2018-10-20 00:00:00.000');
+    let limitDate = new Date('2018-10-22 00:00:00.000');
     let nbPoints = (limitDate > new Date(reblog.timestamp) ? 20 : 5);
     let pointsDetail = new PointsDetail({
       nbPoints: nbPoints,
@@ -559,7 +560,6 @@ async function updateSteemplusPointsReblogs(reblogs) {
       timestampString: utils.formatDate(reblog.timestamp),
       requestType: 4
     });
-    console.log(pointsDetail);
     pointsDetail = await pointsDetail.save();
 
     // Update user account
@@ -571,189 +571,187 @@ async function updateSteemplusPointsReblogs(reblogs) {
   console.log(`Added ${nbPointDetailsAdded} pointDetails`);
 }
 
-exports.updateSteemplusPoints = function() {
-  setTimeout(function() {
-    // Get dynamic properties of steem to be able to calculate prices
-    Promise.all([
-      steem.api.getDynamicGlobalPropertiesAsync(),
-      utils.getPriceSBDAsync(),
-      utils.getPriceSteemAsync(),
-      utils.getLastBlockID()
-    ]).then(async function(values) {
-      currentTotalSteem = Number(
-        values["0"].total_vesting_fund_steem.split(" ")[0]
-      );
-      currentTotalVests = Number(
-        values["0"].total_vesting_shares.split(" ")[0]
-      );
+exports.updateSteemplusPoints = async function() {
+  // Get dynamic properties of steem to be able to calculate prices
+  await Promise.all([
+    steem.api.getDynamicGlobalPropertiesAsync(),
+    utils.getPriceSBDAsync(),
+    utils.getPriceSteemAsync(),
+    utils.getLastBlockID()
+  ]).then(async function(values) {
+    currentTotalSteem = Number(
+      values["0"].total_vesting_fund_steem.split(" ")[0]
+    );
+    currentTotalVests = Number(
+      values["0"].total_vesting_shares.split(" ")[0]
+    );
 
-      // Calculate ration SBD/Steem
-      currentRatioSBDSteem = values[2] / values[1];
-      utils.storeSteemPriceInBlockchain(
-        values[2],
-        values[1],
-        currentTotalSteem,
-        currentTotalVests
-      );
+    // Calculate ration SBD/Steem
+    currentRatioSBDSteem = values[2] / values[1];
+    utils.storeSteemPriceInBlockchain(
+      values[2],
+      values[1],
+      currentTotalSteem,
+      currentTotalVests
+    );
 
-      //get price history
-      await new sql.ConnectionPool(config.config_api)
-        .connect()
-        .then(pool => {
-          return pool.request().query(`
-          SELECT timestamp, memo
-          FROM TxTransfers
-          WHERE timestamp > '2018-08-03 12:05:42.000'
-          and [from] = 'steemplus-bot'
-          and [to] = 'steemplus-bot'
-          and memo LIKE '%priceHistory%'
-          ORDER BY timestamp DESC;
-          `);
-        })
-        .then(result => {
-          // get result
-          priceHistory = result.recordsets[0];
-          sql.close();
-        })
-        .catch(error => {
-          console.log(error);
-          sql.close();
-        });
+    //get price history
+    await new sql.ConnectionPool(config.config_api)
+      .connect()
+      .then(pool => {
+        return pool.request().query(`
+        SELECT timestamp, memo
+        FROM TxTransfers
+        WHERE timestamp > '2018-08-03 12:05:42.000'
+        and [from] = 'steemplus-bot'
+        and [to] = 'steemplus-bot'
+        and memo LIKE '%priceHistory%'
+        ORDER BY timestamp DESC;
+        `);
+      })
+      .then(result => {
+        // get result
+        priceHistory = result.recordsets[0];
+        sql.close();
+      })
+      .catch(error => {
+        console.log(error);
+        sql.close();
+      });
 
-      let delaySteemSQL =
-        (parseInt(values[0].last_irreversible_block_num) -
-          parseInt(values[3])) *
-        3;
+    let delaySteemSQL =
+      (parseInt(values[0].last_irreversible_block_num) -
+        parseInt(values[3])) *
+      3;
 
-      // Get the last entry the requestType 0 (Comments)
-      let lastEntry = await PointsDetail.find({ requestType: 0 })
-        .sort({ timestamp: -1 })
-        .limit(1);
-      // Get the creation date of the last entry
-      let lastEntryDate = null;
-      if (lastEntry[0] !== undefined)
-        lastEntryDate = lastEntry[0].timestampString;
-      else lastEntryDate = "2018-08-10 12:05:42.000"; // This date is the steemplus point annoncement day + 7 days for rewards because rewards come after 7 days.
-      // Wait for SteemSQL's query result before starting the second request
-      // We decided to wait to be sure this function won't try to update the same row twice at the same time
-      await new sql.ConnectionPool(config.config_api)
-        .connect()
-        .then(pool => {
-          return pool.request().query(`
-          SELECT
-            VOCommentBenefactorRewards.sbd_payout, VOCommentBenefactorRewards.steem_payout, VOCommentBenefactorRewards.vesting_payout, VOCommentBenefactorRewards.timestamp as created , Comments.author, Comments.title, Comments.url, Comments.permlink, Comments.beneficiaries, Comments.total_payout_value
-          FROM
-            VOCommentBenefactorRewards
-            INNER JOIN Comments ON VOCommentBenefactorRewards.author = Comments.author AND VOCommentBenefactorRewards.permlink = Comments.permlink
-          WHERE
-            benefactor = 'steemplus-pay'
-          AND timestamp > CONVERT(datetime, '${lastEntryDate}')
-          ORDER BY created ASC;
-          `);
-        })
-        .then(result => {
-          // Start data processing
-          updateSteemplusPointsComments(result.recordsets[0]);
-          sql.close();
-        })
-        .catch(error => {
-          console.log(error);
-          sql.close();
-        });
+    // Get the last entry the requestType 0 (Comments)
+    let lastEntry = await PointsDetail.find({ requestType: 0 })
+      .sort({ timestamp: -1 })
+      .limit(1);
+    // Get the creation date of the last entry
+    let lastEntryDate = null;
+    if (lastEntry[0] !== undefined)
+      lastEntryDate = lastEntry[0].timestampString;
+    else lastEntryDate = "2018-08-10 12:05:42.000"; // This date is the steemplus point annoncement day + 7 days for rewards because rewards come after 7 days.
+    // Wait for SteemSQL's query result before starting the second request
+    // We decided to wait to be sure this function won't try to update the same row twice at the same time
+    await new sql.ConnectionPool(config.config_api)
+      .connect()
+      .then(pool => {
+        return pool.request().query(`
+        SELECT
+          VOCommentBenefactorRewards.sbd_payout, VOCommentBenefactorRewards.steem_payout, VOCommentBenefactorRewards.vesting_payout, VOCommentBenefactorRewards.timestamp as created , Comments.author, Comments.title, Comments.url, Comments.permlink, Comments.beneficiaries, Comments.total_payout_value
+        FROM
+          VOCommentBenefactorRewards
+          INNER JOIN Comments ON VOCommentBenefactorRewards.author = Comments.author AND VOCommentBenefactorRewards.permlink = Comments.permlink
+        WHERE
+          benefactor = 'steemplus-pay'
+        AND timestamp > CONVERT(datetime, '${lastEntryDate}')
+        ORDER BY created ASC;
+        `);
+      })
+      .then(result => {
+        // Start data processing
+        updateSteemplusPointsComments(result.recordsets[0]);
+        sql.close();
+      })
+      .catch(error => {
+        console.log(error);
+        sql.close();
+      });
 
-      // Get the last entry for the second request type (Transfers : Postpromoter)
-      lastEntry = await PointsDetail.find({ requestType: 1 })
-        .sort({ timestamp: -1 })
-        .limit(1);
-      lastEntryDate = null;
-      if (lastEntry[0] !== undefined)
-        lastEntryDate = lastEntry[0].timestampString;
-      else lastEntryDate = "2018-08-03 12:05:42.000"; // This date is the steemplus point annoncement day
+    // Get the last entry for the second request type (Transfers : Postpromoter)
+    lastEntry = await PointsDetail.find({ requestType: 1 })
+      .sort({ timestamp: -1 })
+      .limit(1);
+    lastEntryDate = null;
+    if (lastEntry[0] !== undefined)
+      lastEntryDate = lastEntry[0].timestampString;
+    else lastEntryDate = "2018-08-03 12:05:42.000"; // This date is the steemplus point annoncement day
 
-      // Get the last entry for the second request type (Transfers : MinnowBooster)
-      lastEntryMB = await PointsDetail.find({ requestType: 2 })
-        .sort({ timestamp: -1 })
-        .limit(1);
-      lastEntryDateMB = null;
-      if (lastEntryMB[0] !== undefined)
-        lastEntryDateMB = lastEntryMB[0].timestampString;
-      else lastEntryDateMB = "2018-08-03 12:05:42.000"; // This date is the steemplus point annoncement day
-      // Execute SteemSQL query
-      await new sql.ConnectionPool(config.config_api)
-        .connect()
-        .then(pool => {
-          return pool.request().query(`
-          SELECT timestamp, [from], [to], amount, amount_symbol, memo
-          FROM TxTransfers
-          WHERE
+    // Get the last entry for the second request type (Transfers : MinnowBooster)
+    lastEntryMB = await PointsDetail.find({ requestType: 2 })
+      .sort({ timestamp: -1 })
+      .limit(1);
+    lastEntryDateMB = null;
+    if (lastEntryMB[0] !== undefined)
+      lastEntryDateMB = lastEntryMB[0].timestampString;
+    else lastEntryDateMB = "2018-08-03 12:05:42.000"; // This date is the steemplus point annoncement day
+    // Execute SteemSQL query
+    await new sql.ConnectionPool(config.config_api)
+      .connect()
+      .then(pool => {
+        return pool.request().query(`
+        SELECT timestamp, [from], [to], amount, amount_symbol, memo
+        FROM TxTransfers
+        WHERE
+        (
+          timestamp > CONVERT(datetime, '${lastEntryDate}')
+          AND
           (
-            timestamp > CONVERT(datetime, '${lastEntryDate}')
-            AND
-            (
-                ([to] = 'steemplus-pay' AND [from] != 'steemplus-pay' AND [from] != 'minnowbooster')
-            )
+              ([to] = 'steemplus-pay' AND [from] != 'steemplus-pay' AND [from] != 'minnowbooster')
           )
-          OR
+        )
+        OR
+        (
+          timestamp > CONVERT(datetime, '${lastEntryDateMB}')
+          AND
           (
-            timestamp > CONVERT(datetime, '${lastEntryDateMB}')
-            AND
-            (
-              ([from] = 'minnowbooster' AND memo LIKE '%memo:%')
-            OR
-              ([from] = 'minnowbooster' AND memo LIKE '%permlink:%')
-            OR
-              ([from] = 'minnowbooster' AND memo LIKE '%Post:%')
-            OR
-              ([to] = 'minnowbooster' AND memo LIKE 'steemplus%' AND timestamp < DATEADD(second, -${delaySteemSQL +
-                10 * 60}, GETUTCDATE()))
-            )
-          );
-        `);
-        })
-        .then(result => {
-          updateSteemplusPointsTransfers(result.recordsets[0]);
-          sql.close();
-        })
-        .catch(error => {
-          console.log(error);
-          sql.close();
-        });
+            ([from] = 'minnowbooster' AND memo LIKE '%memo:%')
+          OR
+            ([from] = 'minnowbooster' AND memo LIKE '%permlink:%')
+          OR
+            ([from] = 'minnowbooster' AND memo LIKE '%Post:%')
+          OR
+            ([to] = 'minnowbooster' AND memo LIKE 'steemplus%' AND timestamp < DATEADD(second, -${delaySteemSQL +
+              10 * 60}, GETUTCDATE()))
+          )
+        );
+      `);
+      })
+      .then(result => {
+        updateSteemplusPointsTransfers(result.recordsets[0]);
+        sql.close();
+      })
+      .catch(error => {
+        console.log(error);
+        sql.close();
+      });
 
-      // Get the last entry the requestType 4 (Reblogs)
-      lastEntry = await PointsDetail.find({ requestType: 4 })
-        .sort({ timestamp: -1 })
-        .limit(1);
-      // Get the creation date of the last entry
-      lastEntryDate = null;
-      if (lastEntry[0] !== undefined)
-        lastEntryDate = lastEntry[0].timestampString;
-      else lastEntryDate = "2018-08-03 12:05:42.000"; // This date is the steemplus point annoncement day + 7 days for rewards because rewards come after 7 days.
-      // Wait for SteemSQL's query result before starting the second request
-      // We decided to wait to be sure this function won't try to update the same row twice at the same time
-      await new sql.ConnectionPool(config.config_api)
-        .connect()
-        .then(pool => {
-          return pool.request().query(`
-          SELECT account, Reblogs.permlink, timestamp
-          FROM Reblogs
-          INNER JOIN Comments
-          ON Comments.author = Reblogs.author
-          AND Comments.permlink = Reblogs.permlink
-          WHERE Comments.author = 'steem-plus' 
-          AND timestamp > CONVERT(datetime, '${lastEntryDate}')
-          AND depth = 0
-          AND Comments.created > DATEADD(day, -7, timestamp);
-        `);
-        })
-        .then(result => {
-          // Start data processing
-          updateSteemplusPointsReblogs(result.recordsets[0]);
-          sql.close();
-        })
-        .catch(error => {
-          console.log(error);
-          sql.close();
-        });
-    });
-  }, 0);
+    // Get the last entry the requestType 4 (Reblogs)
+    lastEntry = await PointsDetail.find({ requestType: 4 })
+      .sort({ timestamp: -1 })
+      .limit(1);
+    // Get the creation date of the last entry
+    lastEntryDate = null;
+    if (lastEntry[0] !== undefined)
+      lastEntryDate = lastEntry[0].timestampString;
+    else lastEntryDate = "2018-08-03 12:05:42.000"; // This date is the steemplus point annoncement day + 7 days for rewards because rewards come after 7 days.
+    // Wait for SteemSQL's query result before starting the second request
+    // We decided to wait to be sure this function won't try to update the same row twice at the same time
+    await new sql.ConnectionPool(config.config_api)
+      .connect()
+      .then(pool => {
+        return pool.request().query(`
+        SELECT account, Reblogs.permlink, timestamp
+        FROM Reblogs
+        INNER JOIN Comments
+        ON Comments.author = Reblogs.author
+        AND Comments.permlink = Reblogs.permlink
+        WHERE Comments.author = 'steem-plus' 
+        AND timestamp > CONVERT(datetime, '${lastEntryDate}')
+        AND depth = 0
+        AND Comments.created > DATEADD(day, -7, timestamp);
+      `);
+      })
+      .then(result => {
+        // Start data processing
+        updateSteemplusPointsReblogs(result.recordsets[0]);
+        sql.close();
+      })
+      .catch(error => {
+        console.log(error);
+        sql.close();
+      });
+  });
 };

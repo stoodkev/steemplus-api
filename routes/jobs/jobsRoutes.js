@@ -7,6 +7,11 @@ const steem = require("steem");
 
 const VOTING_ACCOUNT = "steem-plus";
 
+let payDelegationsStarted = false;
+let growStarted = false;
+let updateSteemplusPointsStarted = false;
+let botVoteStarted = false;
+
 const jobRoutes = function(app) {
   // Method used to give user rewards depending on delegations
   app.get("/job/pay-delegations/:key", async function(req, res) {
@@ -14,8 +19,14 @@ const jobRoutes = function(app) {
       res.status(403).send("Permission denied");
       return;
     }
-    spp.payDelegations();
+    if(payDelegationsStarted) {
+      res.status(403).send("Already started");
+      return;
+    }
+    payDelegationsStarted = true;
     res.status(200).send("OK");
+    await spp.payDelegations();
+    payDelegationsStarted = false;
   });
 
   app.get("/job/grow/:key", async function(req, res) {
@@ -23,8 +34,14 @@ const jobRoutes = function(app) {
       res.status(403).send("Permission denied");
       return;
     }
-    steemplusPay.grow();
+    if(growStarted) {
+      res.status(403).send("Already started");
+      return;
+    }
+    growStarted = true;
     res.status(200).send("OK");
+    await steemplusPay.grow();
+    growStarted = false;
   });
 
   // This function is used to update steemplus point.
@@ -36,8 +53,18 @@ const jobRoutes = function(app) {
       res.status(403).send("Permission denied");
       return;
     }
-    spp.updateSteemplusPoints();
+    if(updateSteemplusPointsStarted) {
+      res.status(403).send("Already started");
+      return;
+    }
+    console.log(updateSteemplusPointsStarted);
+    updateSteemplusPointsStarted = true;
+    console.log(updateSteemplusPointsStarted);
     res.status(200).send("OK");
+    await spp.updateSteemplusPoints();
+    console.log("Finished")
+    updateSteemplusPointsStarted = false;
+    console.log(updateSteemplusPointsStarted);
   });
 
   // Bot for Steemplus daily vote
@@ -46,9 +73,17 @@ const jobRoutes = function(app) {
       res.status(403).send("Permission denied");
       return;
     }
+    if(botVoteStarted) {
+      res.status(403).send("Already started");
+      return;
+    }
+    botVoteStarted = true;
     // get Steem-plus voting power
-    steem.api.getAccounts([VOTING_ACCOUNT], function(err, result) {
-      if (err) console.log(err);
+    steem.api.getAccounts([VOTING_ACCOUNT], async function(err, result) {
+      if (err) {
+        console.log(err);
+        botVoteStarted = false;
+      } 
       else {
         let spAccount = result[0];
         // Only start voting if the voting power is full
@@ -58,11 +93,13 @@ const jobRoutes = function(app) {
           process.env.CAN_VOTE === "true"
         ) {
           console.log("start voting...");
-          vote.startBotVote(spAccount);
           res.status(200).send("OK");
+          await vote.startBotVote(spAccount);
+          botVoteStarted = false;
         } else {
           if (process.env.CAN_VOTE === "false") {
             console.log("Voting bot disabled...");
+            botVoteStarted = false;
             res.status(200).send("Voting bot disabled...");
           } else {
             let votingPowerSP = utils.getVotingPowerPerAccount(spAccount);
@@ -74,6 +111,7 @@ const jobRoutes = function(app) {
               .send(
                 `Voting power (mana) is only ${votingPowerSP}%... Need to wait more`
               );
+            botVoteStarted = false;
           }
         }
       }
