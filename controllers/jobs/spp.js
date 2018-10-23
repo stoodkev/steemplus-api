@@ -346,7 +346,7 @@ async function updateSteemplusPointsTransfers(transfers) {
   );
   let steemMonstersRequestIDs = transfers.filter(
     transfer =>
-      transfer.to === "steemplus-pay" && transfer.from === "steemmonsters"
+      transfer.to === "steemplus-pay" && transfer.from === "steemmonsters" && transfer.memo.includes("Affiliate payment for Steem Monsters purchase: ")
   );
   steemMonstersRequestIDs = steemMonstersRequestIDs.map(x =>
     x.memo.replace("Affiliate payment for Steem Monsters purchase: ", "")
@@ -459,13 +459,24 @@ async function updateSteemplusPointsTransfers(transfers) {
         transfer.from === "steemmonsters"
       ) {
         type = await TypeTransaction.findOne({ name: "SteemMonsters" });
-        accountName =
+        if(transfer.memo.includes('Affiliate payment for Steem Monsters purchase: '))
+        {
+          accountName =
           steemMonstersRequestUser[
             transfer.memo.replace(
               "Affiliate payment for Steem Monsters purchase: ",
               ""
             )
           ];
+        }
+        else {
+          accountName =
+            transfer.memo.replace(
+              "Merchant payment for market sales. Account: @",
+              ""
+            );
+        }
+        
         amount = transfer.amount;
         requestType = 1;
         permlink = "";
