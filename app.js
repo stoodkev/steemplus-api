@@ -9,6 +9,8 @@ const app = express();
 require("dotenv").config();
 const RateLimit = require("express-rate-limit");
 const mongoose = require("mongoose");
+const cors = require('cors')
+
 
 app.enable("trust proxy"); // only if you're behind a reverse proxy (Heroku, Bluemix, AWS if you use an ELB, custom Nginx setup, etc)
 
@@ -23,6 +25,8 @@ app.use(limiter);
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(cors({origin: '*'}));
+
 const uristring =
   process.env.MONGOLAB_PINK_URI ||
   process.env.MONGODB_URI ||
