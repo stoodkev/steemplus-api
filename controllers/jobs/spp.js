@@ -469,10 +469,10 @@ async function updateSteemplusPointsTransfers(transfers) {
             )
           ];
         }
-        else {
+        else if(transfer.memo.includes('Merchant payment for market sales. Account: ')) {
           accountName =
             transfer.memo.replace(
-              "Merchant payment for market sales. Account: @",
+              "Merchant payment for market sales. Account: ",
               ""
             );
         }
