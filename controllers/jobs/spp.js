@@ -558,7 +558,7 @@ async function updateSteemplusPointsReblogs(reblogs) {
     }
     let type = await TypeTransaction.findOne({ name: "Reblog" });
     // Create new PointsDetail entry
-    let limitDate = new Date('2018-10-22 00:00:00.000');
+    let limitDate = new Date('2018-10-26 00:00:00.000');
     let nbPoints = (limitDate > new Date(reblog.timestamp) ? 20 : 5);
     let pointsDetail = new PointsDetail({
       nbPoints: nbPoints,
