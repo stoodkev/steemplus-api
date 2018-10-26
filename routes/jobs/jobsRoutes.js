@@ -20,7 +20,7 @@ const jobRoutes = function(app) {
       return;
     }
     if(payDelegationsStarted) {
-      res.status(403).send("Already started");
+      res.status(403).send("Pay delegation already started");
       return;
     }
     payDelegationsStarted = true;
@@ -35,7 +35,7 @@ const jobRoutes = function(app) {
       return;
     }
     if(growStarted) {
-      res.status(403).send("Already started");
+      res.status(403).send("Grow already started");
       return;
     }
     growStarted = true;
@@ -54,7 +54,7 @@ const jobRoutes = function(app) {
       return;
     }
     if(updateSteemplusPointsStarted) {
-      res.status(403).send("Already started");
+      res.status(403).send("Update Steemplus Points already started");
       return;
     }
     console.log(updateSteemplusPointsStarted);
@@ -74,7 +74,7 @@ const jobRoutes = function(app) {
       return;
     }
     if(botVoteStarted) {
-      res.status(403).send("Already started");
+      res.status(403).send("Bot vote already started");
       return;
     }
     botVoteStarted = true;
