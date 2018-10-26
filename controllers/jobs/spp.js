@@ -459,7 +459,12 @@ async function updateSteemplusPointsTransfers(transfers) {
         transfer.from === "steemmonsters"
       ) {
         type = await TypeTransaction.findOne({ name: "SteemMonsters" });
-        if(transfer.memo.includes('Affiliate payment for Steem Monsters purchase: '))
+        if(/Account: ([a-z0-9\-\.]{3,})/.test(transfer.memo)) {
+          accountName =
+            transfer.memo.match(
+              /Account: ([a-z0-9\-\.]{3,})/)[1];
+        }
+        else if(transfer.memo.includes('Affiliate payment for Steem Monsters purchase: '))
         {
           accountName =
           steemMonstersRequestUser[
@@ -469,13 +474,7 @@ async function updateSteemplusPointsTransfers(transfers) {
             )
           ];
         }
-        else if(transfer.memo.includes('Merchant payment for market sales. Account: ')) {
-          accountName =
-            transfer.memo.replace(
-              "Merchant payment for market sales. Account: ",
-              ""
-            );
-        }
+        
         
         amount = transfer.amount;
         requestType = 1;
