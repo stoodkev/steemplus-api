@@ -56,7 +56,7 @@ exports.grow = async function() {
     let priceSBDUSB = await utils.getSBDPriceUSD();
     if (
       parseFloat(steemPlusPay[0].sbd_balance.split(" ")[0]) >= 10 &&
-      priceSBDUSB >= 0.99
+      priceSBDUSB <= 0.99
     ) {
       await steem.broadcast.convertAsync(
         config.payActKey,
