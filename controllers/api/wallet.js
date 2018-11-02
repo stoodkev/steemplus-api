@@ -1,5 +1,6 @@
 const config = require("../../config");
 const sql = require("mssql");
+const steem = require("steem");
 
 exports.getContent = function(username) {
   return new sql.ConnectionPool(config.config_api)
@@ -29,6 +30,41 @@ exports.getContent = function(username) {
     .then(result => {
       sql.close();
       return result.recordsets[0];
+    })
+    .catch(error => {
+      console.log(error);
+      sql.close();
+    });
+};
+
+exports.getSP = (username) => {
+  return new sql.ConnectionPool(config.config_api)
+    .connect()
+    .then(pool => {
+      return pool
+        .request()
+        .input("username", username)
+        .query(
+          `SELECT replace(vesting_shares, ' VESTS', '') as own, replace(delegated_vesting_shares, ' VESTS', '') as sent,replace(received_vesting_shares, ' VESTS', '') as received
+           FROM Accounts
+           WHERE name = @username;`
+        );
+    })
+    .then(result => {
+      sql.close();
+      return steem.api.getDynamicGlobalPropertiesAsync()
+        .then(function(values) 
+        {
+          totalSteem = Number(values.total_vesting_fund_steem.split(" ")[0]);
+          totalVests = Number(values.total_vesting_shares.split(" ")[0]);
+          return {
+            own: steem.formatter.vestToSteem(parseFloat(result.recordset[0].own), totalVests, totalSteem),
+            received: steem.formatter.vestToSteem(parseFloat(result.recordset[0].received), totalVests, totalSteem),
+            sent: steem.formatter.vestToSteem(parseFloat(result.recordset[0].sent), totalVests, totalSteem),
+            total: steem.formatter.vestToSteem(parseFloat(result.recordset[0].own) + parseFloat(result.recordset[0].received) - parseFloat(result.recordset[0].sent) , totalVests, totalSteem)
+          };
+        });
+
     })
     .catch(error => {
       console.log(error);
