@@ -1,6 +1,22 @@
 const User = require("../../models/user.js");
 const PointsDetail = require("../../models/pointsDetail.js");
 const TypeTransaction = require("../../models/typeTransaction.js");
+const utils = require("../../utils.js");
+
+
+// Function used to add a given number of days
+function addDays(date, days) {
+  let result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+// FUnction used to substract a given number of days
+function subDays(date, days) {
+  let result = new Date(date);
+  result.setDate(result.getDate() - days);
+  return result;
+}
 
 // Function used to get statistics about SPP :
 // - Total amount delivered
@@ -136,3 +152,82 @@ exports.getSppStats = async function() {
   //console.log(result);
   return result;
 };
+
+exports.getRankings = async function() {
+  let result = {};
+  let tmp = null;
+  let dateNow = new Date();
+
+  const delegationType = await TypeTransaction.findOne({"name": "Delegation"});
+  // Get rewards of all time per user excluding delegations.
+  const foreverQuery = [
+    { "$match": { "typeTransaction": { $nin: [delegationType._id] } } },
+    { "$group": 
+      { 
+        "_id": "$user",
+        points: {
+          $sum: "$nbPoints"
+        }
+      }
+    },
+    {
+      $sort: { points: -1 }
+    }
+  ];
+  tmp = await User.populate(await PointsDetail.aggregate(foreverQuery).exec(), {path: "_id", select: 'accountName'});
+  tmp.map(entry => {
+    entry.name = entry._id.accountName;
+    delete entry._id;
+  });
+  result.forever = tmp;
+
+  // Get only current month spp per user excluding delegations
+  const monthlyQuery = [
+    { "$match": { "typeTransaction": { $nin: [delegationType._id] }, timestamp: { '$gte' : new Date(`${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth() + 1}-01T00:00:00.000Z`) } } },
+    { "$group": 
+      { 
+        "_id": "$user",
+        points: {
+          $sum: "$nbPoints"
+        }
+      }
+    },
+    {
+      $sort: { points: -1 }
+    }
+  ]
+  tmp = await User.populate(await PointsDetail.aggregate(monthlyQuery).exec(), {path: "_id", select: 'accountName'});
+  tmp.map(entry => {
+    entry.name = entry._id.accountName;
+    delete entry._id;
+  });
+  result.monthly = tmp;
+
+  // Get only current month spp per user excluding delegations
+  const weekNumber = utils.weekNumber(dateNow) - 1;
+  let startWeek = new Date(Date.UTC(dateNow.getUTCFullYear(), 0, 1, 0, 0, 0))
+  let endWeek = new Date(Date.UTC(dateNow.getUTCFullYear(), 0, 8, 0, 0, 0))
+  startWeek = addDays(startWeek, weekNumber*7);
+  endWeek = addDays(endWeek, weekNumber*7);
+  const weeklyQuery = [
+    { "$match": { "typeTransaction": { $nin: [delegationType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek} } },
+    { "$group": 
+      { 
+        "_id": "$user",
+        points: {
+          $sum: "$nbPoints"
+        }
+      }
+    },
+    {
+      $sort: { points: -1 }
+    }
+  ]
+  tmp = await User.populate(await PointsDetail.aggregate(weeklyQuery).exec(), {path: "_id", select: 'accountName'});
+  tmp.map(entry => {
+    entry.name = entry._id.accountName;
+    delete entry._id;
+  });
+  result.weekly = tmp;
+  return result;
+}

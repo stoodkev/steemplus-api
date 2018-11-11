@@ -20,6 +20,17 @@ exports.formatDate = function(string) {
     1}-${string.getUTCDate()} ${string.getUTCHours()}:${string.getUTCMinutes()}:${string.getUTCSeconds()}.${string.getUTCMilliseconds()}`;
 };
 
+exports.weekNumber = function(dt) {
+  var tdt = new Date(dt.valueOf());
+  var dayn = (dt.getDay() + 6) % 7;
+  tdt.setDate(tdt.getDate() - dayn + 3);
+  var firstThursday = tdt.valueOf();
+  tdt.setMonth(0, 1);
+  if (tdt.getDay() !== 4) 
+    tdt.setMonth(0, 1 + ((4 - tdt.getDay()) + 7) % 7);
+  return 1 + Math.ceil((firstThursday - tdt) / 604800000); 
+};
+
 exports.commentVotingBot = function(post) {
   let commentBody = `Hi, @${post.author}!\n\n`;
   commentBody += `You just got a **${post.percentage /

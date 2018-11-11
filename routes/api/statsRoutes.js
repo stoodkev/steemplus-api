@@ -8,6 +8,10 @@ const statsRouter = function(app) {
   app.get("/get-spp-stats", function(req, res) {
     res.redirect("/spp-stats");
   });
+
+  app.get("/rankings", async function(req, res) {
+	res.status(200).send(await stats.getRankings());
+  });
 };
 
 module.exports = statsRouter;
