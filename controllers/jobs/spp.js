@@ -814,7 +814,7 @@ exports.updateSteemplusPoints = async function() {
       .connect()
       .then(pool => {
         return pool.request().query(`
-        SELECT account, Reblogs.permlink, timestamp
+        SELECT account, Comments.url as permlink, timestamp
         FROM Reblogs
         INNER JOIN Comments
         ON Comments.author = Reblogs.author
