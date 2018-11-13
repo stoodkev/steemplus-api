@@ -781,6 +781,8 @@ exports.updateSteemplusPoints = async function() {
         )
         OR 
         (
+          timestamp > CONVERT(datetime, '${lastEntryDate}')
+          AND
           [to] = 'steem-plus' AND memo LIKE 'Project=Fundition-6om5dpvkb%'
         );
       `);
