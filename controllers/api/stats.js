@@ -2,6 +2,8 @@ const User = require("../../models/user.js");
 const PointsDetail = require("../../models/pointsDetail.js");
 const TypeTransaction = require("../../models/typeTransaction.js");
 const utils = require("../../utils.js");
+const delegations = require("./delegations.js");
+const steem = require("steem");
 
 
 // Function used to add a given number of days
@@ -159,8 +161,6 @@ exports.getRankings = async function() {
   let dateNow = new Date();
   const userNotIncluded = await User.find({"accountName": {$in :["stoodkev", "steem-plus"]}});
 
-  console.log(userNotIncluded);
-
   const delegationType = await TypeTransaction.findOne({"name": "Delegation"});
   // Get rewards of all time per user excluding delegations.
   const foreverQuery = [
@@ -235,5 +235,24 @@ exports.getRankings = async function() {
     delete entry._id;
   });
   result.weekly = tmp;
+
+  // Get delegations ranking
+  tmp = await delegations.getIncomingRanking("steem-plus");
+  let globalProperties = await steem.api.getDynamicGlobalPropertiesAsync()
+  .then(function(values) 
+  {
+    totalSteem = Number(values.total_vesting_fund_steem.split(" ")[0]);
+    totalVests = Number(values.total_vesting_shares.split(" ")[0]);
+    return {totalSteem: totalSteem, totalVests: totalVests};
+  });
+
+  tmp.sort(function(a, b){return b.vesting_shares - a.vesting_shares});
+  tmp.map((entry, index) => {
+    entry.rank = index + 1;
+    entry.sp = steem.formatter.vestToSteem(parseFloat(entry.vesting_shares), globalProperties.totalVests, globalProperties.totalSteem).toFixed(2);
+    delete entry.vesting_shares;
+    delete entry.delegation_date;
+  });
+  result.delegations = tmp;
   return result;
 }
