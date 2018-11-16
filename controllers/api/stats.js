@@ -157,11 +157,14 @@ exports.getRankings = async function() {
   let result = {};
   let tmp = null;
   let dateNow = new Date();
+  const userNotIncluded = await User.find({"accountName": {$in :["stoodkev", "steem-plus"]}});
+
+  console.log(userNotIncluded);
 
   const delegationType = await TypeTransaction.findOne({"name": "Delegation"});
   // Get rewards of all time per user excluding delegations.
   const foreverQuery = [
-    { "$match": { "typeTransaction": { $nin: [delegationType._id] } } },
+    { "$match": { "typeTransaction": { $nin: [delegationType._id] }, "user": { $nin: userNotIncluded.map(u => u._id)} } },
     { "$group": 
       { 
         "_id": "$user",
@@ -175,7 +178,8 @@ exports.getRankings = async function() {
     }
   ];
   tmp = await User.populate(await PointsDetail.aggregate(foreverQuery).exec(), {path: "_id", select: 'accountName'});
-  tmp.map(entry => {
+  tmp.map((entry, index) => {
+    entry.rank = index + 1;
     entry.name = entry._id.accountName;
     delete entry._id;
   });
@@ -183,7 +187,7 @@ exports.getRankings = async function() {
 
   // Get only current month spp per user excluding delegations
   const monthlyQuery = [
-    { "$match": { "typeTransaction": { $nin: [delegationType._id] }, timestamp: { '$gte' : new Date(`${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth() + 1}-01T00:00:00.000Z`) } } },
+    { "$match": { "typeTransaction": { $nin: [delegationType._id] }, timestamp: { '$gte' : new Date(`${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth() + 1}-01T00:00:00.000Z`) }, "user": { $nin: userNotIncluded.map(u => u._id)} } },
     { "$group": 
       { 
         "_id": "$user",
@@ -197,7 +201,8 @@ exports.getRankings = async function() {
     }
   ]
   tmp = await User.populate(await PointsDetail.aggregate(monthlyQuery).exec(), {path: "_id", select: 'accountName'});
-  tmp.map(entry => {
+  tmp.map((entry, index) => {
+    entry.rank = index + 1;
     entry.name = entry._id.accountName;
     delete entry._id;
   });
@@ -210,7 +215,7 @@ exports.getRankings = async function() {
   startWeek = addDays(startWeek, weekNumber*7);
   endWeek = addDays(endWeek, weekNumber*7);
   const weeklyQuery = [
-    { "$match": { "typeTransaction": { $nin: [delegationType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek} } },
+    { "$match": { "typeTransaction": { $nin: [delegationType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
     { "$group": 
       { 
         "_id": "$user",
@@ -224,7 +229,8 @@ exports.getRankings = async function() {
     }
   ]
   tmp = await User.populate(await PointsDetail.aggregate(weeklyQuery).exec(), {path: "_id", select: 'accountName'});
-  tmp.map(entry => {
+  tmp.map((entry, index) => {
+    entry.rank = index + 1;
     entry.name = entry._id.accountName;
     delete entry._id;
   });
