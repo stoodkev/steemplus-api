@@ -222,6 +222,7 @@ exports.getRankings = async function() {
     entry.name = entry._id.accountName;
     delete entry._id;
   });
+  result.endDate = endWeek;
   result.weekly = tmp;
 
   // Get delegations ranking
