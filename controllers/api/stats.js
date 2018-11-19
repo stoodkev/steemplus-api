@@ -6,19 +6,6 @@ const delegations = require("./delegations.js");
 const steem = require("steem");
 
 
-// Function used to add a given number of days
-function addDays(date, days) {
-  let result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-}
-
-// FUnction used to substract a given number of days
-function subDays(date, days) {
-  let result = new Date(date);
-  result.setDate(result.getDate() - days);
-  return result;
-}
 
 // Function used to get statistics about SPP :
 // - Total amount delivered
@@ -208,12 +195,13 @@ exports.getRankings = async function() {
   });
   result.monthly = tmp;
 
-  // Get only current month spp per user excluding delegations
-  const weekNumber = utils.weekNumber(dateNow) - 1;
-  let startWeek = new Date(Date.UTC(dateNow.getUTCFullYear(), 0, 1, 0, 0, 0))
-  let endWeek = new Date(Date.UTC(dateNow.getUTCFullYear(), 0, 8, 0, 0, 0))
-  startWeek = addDays(startWeek, weekNumber*7);
-  endWeek = addDays(endWeek, weekNumber*7);
+  const previousMonday = utils.getLastWeekday(new Date(), 1);
+  const nextSunday = utils.addDays(previousMonday , 6);
+
+  // Get only current week spp per user excluding delegations
+  const endWeek = new Date(Date.UTC(nextSunday.getUTCFullYear(), nextSunday.getUTCMonth(), nextSunday.getUTCDate(), 23, 59, 59, 0));
+  const startWeek = new Date(Date.UTC(previousMonday.getUTCFullYear(), previousMonday.getUTCMonth(), previousMonday.getUTCDate(), 0, 0, 0, 0));
+ 
   const weeklyQuery = [
     { "$match": { "typeTransaction": { $nin: [delegationType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
     { "$group": 
