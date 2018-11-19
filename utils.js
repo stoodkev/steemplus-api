@@ -4,6 +4,11 @@ const getJSON = require("get-json");
 const steem = require("steem");
 const config = require("./config.js");
 
+
+exports.numberWithCommas = (x) => {
+  return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+};
+
 exports.commentNewUser = function(post, lastUpdate, numUsers) {
   let commentBody = `#### Welcome to Steem, @${post.author}!\n\n`;
   commentBody += `I am a bot coded by the SteemPlus team to help you make the best of your experience on the Steem Blockchain!\n`;
