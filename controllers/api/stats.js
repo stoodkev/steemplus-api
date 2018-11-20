@@ -125,7 +125,7 @@ exports.getSppStats = async function() {
   result.points_per_transaction_day = ppt_day;
   const total_day_exclusive = ppt_day
     .reduce(function(a, b) {
-      return (b.type == "Delegation"||b.type=="Reblog" )? a : a + parseFloat(b.points);
+      return (b.type == "Delegation"||b.type=="Reblog"||b.type=="Weekly Reward" )? a : a + parseFloat(b.points);
     }, 0)
     .toFixed(3);
 
@@ -146,12 +146,14 @@ exports.getRankings = async function() {
   let result = {};
   let tmp = null;
   let dateNow = new Date();
-  const userNotIncluded = await User.find({"accountName": {$in :["stoodkev", "steem-plus"]}});
+  const userNotIncluded = await User.find({"accountName": {$in :["stoodkev", "steem-plus", "steemplus-pay"]}});
 
   const delegationType = await TypeTransaction.findOne({"name": "Delegation"});
+  const reblogType = await TypeTransaction.findOne({"name": "Reblog"});
+  const weeklyRewardType = await TypeTransaction.findOne({"name": "Weekly Reward"});
   // Get rewards of all time per user excluding delegations.
   const foreverQuery = [
-    { "$match": { "typeTransaction": { $nin: [delegationType._id] }, "user": { $nin: userNotIncluded.map(u => u._id)} } },
+    { "$match": { "user": { $nin: userNotIncluded.map(u => u._id)} } },
     { "$group": 
       { 
         "_id": "$user",
@@ -174,7 +176,7 @@ exports.getRankings = async function() {
 
   // Get only current month spp per user excluding delegations
   const monthlyQuery = [
-    { "$match": { "typeTransaction": { $nin: [delegationType._id] }, timestamp: { '$gte' : new Date(`${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth() + 1}-01T00:00:00.000Z`) }, "user": { $nin: userNotIncluded.map(u => u._id)} } },
+    { "$match": { timestamp: { '$gte' : new Date(`${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth() + 1}-01T00:00:00.000Z`) }, "user": { $nin: userNotIncluded.map(u => u._id)} } },
     { "$group": 
       { 
         "_id": "$user",
@@ -199,11 +201,11 @@ exports.getRankings = async function() {
   const nextSunday = utils.addDays(previousMonday , 6);
 
   // Get only current week spp per user excluding delegations
-  const endWeek = new Date(Date.UTC(nextSunday.getUTCFullYear(), nextSunday.getUTCMonth(), nextSunday.getUTCDate(), 23, 59, 59, 0));
+  const endWeek = new Date(Date.UTC(nextSunday.getUTCFullYear(), nextSunday.getUTCMonth(), nextSunday.getUTCDate(), 23, 59, 59, 999));
   const startWeek = new Date(Date.UTC(previousMonday.getUTCFullYear(), previousMonday.getUTCMonth(), previousMonday.getUTCDate(), 0, 0, 0, 0));
  
   const weeklyQuery = [
-    { "$match": { "typeTransaction": { $nin: [delegationType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
+    { "$match": { "typeTransaction": { $nin: [delegationType._id, reblogType._id, weeklyRewardType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
     { "$group": 
       { 
         "_id": "$user",
