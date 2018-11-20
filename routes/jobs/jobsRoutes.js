@@ -1,6 +1,7 @@
 const config = require("../../config.js");
 const spp = require("../../controllers/jobs/spp.js");
 const vote = require("../../controllers/jobs/vote.js");
+const poststats = require("../../controllers/jobs/poststats.js");
 const steemplusPay = require("../../controllers/jobs/steemplusPay.js");
 const utils = require("../../utils.js");
 const steem = require("steem");
@@ -12,6 +13,7 @@ let growStarted = false;
 let updateSteemplusPointsStarted = false;
 let botVoteStarted = false;
 let weeklyRewardsStarted = false;
+let postStatsStarted = false;
 
 const jobRoutes = function(app) {
   // Method used to give user rewards depending on delegations
@@ -132,6 +134,21 @@ const jobRoutes = function(app) {
         }
       }
     });
+  });
+
+
+  app.get("/job/post-stats/:key", async function(req, res){
+    if (req.params.key !== config.key) {
+      res.status(403).send("Permission denied");
+      return;
+    }
+    if(postStatsStarted) {
+      res.status(403).send("Post Stats already started");
+      return;
+    }
+    postStatsStarted = true;
+    res.status(200).send(await poststats.getPostStats());
+    postStatsStarted = false;
   });
 };
 

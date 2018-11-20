@@ -26,6 +26,7 @@ app.use(limiter);
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(cors({origin: '*'}));
+app.use(express.static('public'));
 
 const uristring =
   process.env.MONGOLAB_PINK_URI ||
