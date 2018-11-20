@@ -217,9 +217,26 @@ exports.getRankings = async function() {
     }
   ]
   tmp = await User.populate(await PointsDetail.aggregate(weeklyQuery).exec(), {path: "_id", select: 'accountName'});
+
+  const totalWeekPointsQuery = [
+    { "$match": { "typeTransaction": { $nin: [delegationType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
+    { "$group": 
+      { 
+        "_id": null,
+        points: {
+          $sum: "$nbPoints"
+        }
+      }
+    }
+  ]
+  const totalPointsResponse = await PointsDetail.aggregate(totalWeekPointsQuery).exec();
+  const totalPoints = totalPointsResponse[0].points;
+  const rewardsPercentage = [50, 25, 12.5, 6.25, 3.13, 1.56, 0.78, 0.39, 0.24, 0.15]
   tmp.map((entry, index) => {
     entry.rank = index + 1;
     entry.name = entry._id.accountName;
+    let percentage = (index >= 10 ? 0 : rewardsPercentage[index]);
+    entry.estimatedReward = totalPoints * percentage / 100;
     delete entry._id;
   });
   result.endDate = endWeek;
