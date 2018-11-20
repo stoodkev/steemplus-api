@@ -46,7 +46,7 @@ const apiRouter = function(app) {
     res.status(200).send(await wallet.getContent(req.params.username));
   });
 
-  // Get amount of spp for a given user
+  // Get amount of sp for a given user
   // @parameter @username : username
   app.get("/sp/:username", async function(req, res) {
     res.status(200).send(await wallet.getSP(req.params.username));
