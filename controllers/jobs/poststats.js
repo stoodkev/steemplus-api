@@ -1,17 +1,10 @@
 
 const statsController = require("../api/stats.js");
 const utils = require("../../utils.js");
+const steem = require("steem");
 const config = require("../../config.js");
 var getJSON = require('get-json');
 
-var fs = require('fs');
-var JSDOM = require('jsdom').JSDOM;
-var jsdom = new JSDOM('<body><div id="container" style="width: 100%;height: 100%;margin: 50px;padding: 50px;"></div></body>', {runScripts: 'dangerously'});
-require('dotenv').config();
-var window = jsdom.window;
-
-var anychart = require('anychart')(window);
-var anychartExport = require('anychart-nodejs')(anychart);
 
 exports.getPostStats = async function () {
   const stats=await statsController.getSppStats();
@@ -32,23 +25,24 @@ exports.getPostStats = async function () {
   <h3>Distribution per type</h3>";
   // create a chart and set the data
   let data=stats.points_per_transaction.map(function(a){return {x:a.type,value:a.points};});
-  let chart = anychart.pie(data);
-  chart.title("Distribution of SPP per type");
-  chart.bounds(0, 0, 800, 600);
-  // set the container id
-  chart.container("container");
-  chart.labels().position("outside");
-  chart.legend().paginator(false);
-  chart.legend().itemsLayout('horizontal-expandable');
-  chart.legend().maxWidth("600");
-  // initiate drawing the chart
-  chart.draw();
-  // generate JPG image and save it to a file
-  const image= await anychartExport.exportTo(chart, 'jpg');
-  const fs_error=await fs.writeFile('public/distribution_per_type.jpg',image);
+  let chd = [];
+  let chdl = [];
+  let chl = [];
+
+  let total = 0;
+  for(d of data){
+    total += parseFloat(d.value);
+  }
+  console.log(total);
+  for(d of data){
+    chd.push(parseFloat(d.value));
+    chl.push((parseFloat(d.value)/total*100).toFixed(0));
+    chdl.push(d.x);
+  }
+  let url = `https://image-charts.com/chart?cht=pd&chs=600x600&chd=a:${chd.join(',')}&chdl=${chdl.join('|')}&chl=${chl.join('|')}&chco=380474|7171C6|3300FF|6666FF|836FFF|0276FD|0198E1|00B2EE|87CEFA|C6E2FF|BFEFFF`
+
   const daily=await getDailyUsers();
-  console.log(daily);
-  body+="<br><img src='"+config.serverURL+"/distribution_per_type.jpg'/>";
+  body+="<br><img src='"+url+"'/>";
   body+="<br><h3>How to earn SPP?</h3><br>\
   <p>If you are already using SteemPlus, youcan find detailed explanations about how to earn SPP from your wallet, by clicking on the arrow near your\
   SteemPlus Points balance and clicking on \'How to earn SPP?\' or on the SPP tab of our <a href='https://steemplus.app'>landing page</a></p>\
@@ -58,9 +52,9 @@ exports.getPostStats = async function () {
   It brings over 30 novel features to your Steem experience on Steemit, Busy and Steem Monsters.\
   As you can see above, you can also earn SPP by performing certain actions. This will allow you to redeem your SPP for premium features or hold them to receive daily @steem-plus upvotes.</p>\
   <p>To check all our awesome features and donwload the extension, please visit our <a href='https://steemplus.app'>landing page</a>.</p>";
-/*  steem.broadcast.comment("5JC7DdhqzsKvRTNPRffDzbJ8pyr6tNqqPs4H97AQToqs9UrEzHy", "", "steemplus", "lecaillon", "spp-stats-"+Date.now(), title, body, {}, function(err, result) {
+  steem.broadcast.comment(process.env.WIF, "", "steemplus", "steem-plus", "spp-stats-"+Date.now(), title, body, {}, function(err, result) {
     console.log(err, result);
-  });*/
+  });
   return(title+body);
 };
 
