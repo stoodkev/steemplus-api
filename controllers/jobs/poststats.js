@@ -22,7 +22,8 @@ exports.getPostStats = async function () {
   }
   body+="</table>\
   <br>\
-  <h3>Distribution per type</h3>";
+  <h3>Distribution per type</h3>\
+  <p>This donut chart shows which categories earn the most SPP (in percentage).<br>Only delegations are not shown here.</p>"
   // create a chart and set the data
   let data=stats.points_per_transaction.map(function(a){return {x:a.type,value:a.points};});
   let chd = [];
@@ -52,16 +53,16 @@ exports.getPostStats = async function () {
   It brings over 30 novel features to your Steem experience on Steemit, Busy and Steem Monsters.\
   As you can see above, you can also earn SPP by performing certain actions. This will allow you to redeem your SPP for premium features or hold them to receive daily @steem-plus upvotes.</p>\
   <p>To check all our awesome features and download the extension, please visit our <a href='https://steemplus.app'>landing page</a>.</p>";
-  
+
   const dateNow = new Date();
   const permlink = `spp-stats-${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth() + 1}-${dateNow.getUTCDate()}`;
   // const author = "steem-plus";
-  const author = "lecaillon";
+  const author = "steem-plus";
   const operations = [
     ['comment',
       {
         parent_author: '',
-        parent_permlink: '',
+        parent_permlink: 'steemplus',
         author: author,
         permlink: permlink,
         title: title,
@@ -76,19 +77,17 @@ exports.getPostStats = async function () {
       {
         author: author,
         permlink: permlink,
-        max_accepted_payout: "100000 SBD",
+        max_accepted_payout: '100000.000 SBD',
         percent_steem_dollars: 0,
         allow_votes: true,
         allow_curation_rewards: true,
         extensions: [
-          [0, {}]
         ]
       }
     ]
   ];
   console.log(operations)
-  // steem.broadcast.comment(operations, { posting: process.env.WIF },function(e, r){});
-  steem.broadcast.send({ operations: operations, extensions: [] }, { posting: "clef lecaillon" },function(e, r){console.log(e,r)});
+  steem.broadcast.send({ operations: operations, extensions: [] }, { posting: process.env.WIF },function(e, r){console.log(e,r)});
 
   return(title+body);
 };
@@ -109,4 +108,3 @@ function getDailyUsers(){
     });
   });
 }
-
