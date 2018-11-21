@@ -23,7 +23,7 @@ exports.getPostStats = async function () {
   body+="</table>\
   <br>\
   <h3>Distribution per type</h3>\
-  <p>This donut chart shows which categories earn the most SPP (in percentage).<br>Only delegations are not shown here.</p>"
+  <p>This donut chart shows which categories earn the most SPP (in percentage).</p>"
   // create a chart and set the data
   let data=stats.points_per_transaction.map(function(a){return {x:a.type,value:a.points};});
   let chd = [];
