@@ -51,10 +51,45 @@ exports.getPostStats = async function () {
   <p>SteemPlus is a Chrome, Opera and Firefox extension used by "+daily.total+" users daily.<br>\
   It brings over 30 novel features to your Steem experience on Steemit, Busy and Steem Monsters.\
   As you can see above, you can also earn SPP by performing certain actions. This will allow you to redeem your SPP for premium features or hold them to receive daily @steem-plus upvotes.</p>\
-  <p>To check all our awesome features and donwload the extension, please visit our <a href='https://steemplus.app'>landing page</a>.</p>";
-  steem.broadcast.comment(process.env.WIF, "", "steemplus", "steem-plus", "spp-stats-"+Date.now(), title, body, {}, function(err, result) {
-    console.log(err, result);
-  });
+  <p>To check all our awesome features and download the extension, please visit our <a href='https://steemplus.app'>landing page</a>.</p>";
+  
+  const dateNow = new Date();
+  const permlink = `spp-stats-${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth() + 1}-${dateNow.getUTCDate()}`;
+  // const author = "steem-plus";
+  const author = "lecaillon";
+  const operations = [
+    ['comment',
+      {
+        parent_author: '',
+        parent_permlink: '',
+        author: author,
+        permlink: permlink,
+        title: title,
+        body: body,
+        json_metadata : JSON.stringify({
+          tags: ["steemplus", "dev", "stats", "news", "fundition-6om5dpvkb"],
+          app: 'steem-plus-app'
+        })
+      }
+    ],
+    ['comment_options',
+      {
+        author: author,
+        permlink: permlink,
+        max_accepted_payout: "100000 SBD",
+        percent_steem_dollars: 0,
+        allow_votes: true,
+        allow_curation_rewards: true,
+        extensions: [
+          [0, {}]
+        ]
+      }
+    ]
+  ];
+  console.log(operations)
+  // steem.broadcast.comment(operations, { posting: process.env.WIF },function(e, r){});
+  steem.broadcast.send({ operations: operations, extensions: [] }, { posting: "clef lecaillon" },function(e, r){console.log(e,r)});
+
   return(title+body);
 };
 
