@@ -232,7 +232,7 @@ exports.getRankings = async function() {
     }
   ]
   const totalPointsResponse = await PointsDetail.aggregate(totalWeekPointsQuery).exec();
-  const totalPoints = totalPointsResponse[0].points;
+  const totalPoints = totalPointsResponse[0].points * 10 / 100.00;
   const rewardsPercentage = [50, 25, 12.5, 6.25, 3.13, 1.56, 0.78, 0.39, 0.24, 0.15]
   tmp.map((entry, index) => {
     entry.rank = index + 1;
