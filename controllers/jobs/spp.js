@@ -465,19 +465,12 @@ async function updateSteemplusPointsComments(comments) {
     let totalVests = jsonPrice.totalVests;
 
     // Get the amount of the transaction
-    let amount = (
-      (steem.formatter
-        .vestToSteem(parseFloat(comment.vesting_payout), totalVests, totalSteem)
-        .toFixed(3) +
-        parseFloat(comment.steem_payout)) *
-      ratioSBDSteem +
-      parseFloat(comment.sbd_payout)
-    ).toFixed(3);
+    let amount = ((steem.formatter.vestToSteem(parseFloat(comment.vesting_payout), totalVests, totalSteem) + parseFloat(comment.steem_payout) * ratioSBDSteem + parseFloat(comment.sbd_payout)));
     // Get the number of Steemplus points
     let nbPoints = amount * 100;
     let pointsDetail = new PointsDetail({
-      nbPoints: nbPoints,
-      amount: amount,
+      nbPoints: nbPoints.toFixed(3),
+      amount: amount.toFixed(3),
       amountSymbol: "SP",
       permlink: comment.permlink,
       url: comment.url,
