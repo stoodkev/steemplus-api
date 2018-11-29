@@ -13,19 +13,10 @@ exports.debitPremium = () => {
   //   .connect()
   //   .then(pool => {
   //     return pool.request().query(`
-  //       SELECT *
-  //       FROM ( SELECT timestamp, author, permlink, -1 as max_accepted_payout, -1 as percent_steem_dollars, -1 as pending_payout_value, TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, '' as beneficiaries, type='paid_curation' FROM VOCurationRewards WHERE curator=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < GETUTCDATE()
-  //         UNION ALL
-  //         SELECT timestamp, author, permlink, -1 as max_accepted_payout, -1 as percent_steem_dollars, -1 as pending_payout_value, -1 as reward, sbd_payout, steem_payout, vesting_payout, '' as beneficiaries, type='paid_author' FROM VOAuthorRewards WHERE author=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < GETUTCDATE()
-  //         UNION ALL
-  //         SELECT timestamp, author, permlink, -1 as max_accepted_payout, -1 as percent_steem_dollars, -1 as pending_payout_value, -1 as reward, sbd_payout, steem_payout, vesting_payout as vests_payout, '' as beneficiaries, type='paid_benefactor' FROM VOCommentBenefactorRewards WHERE benefactor=@username AND timestamp >= DATEADD(day,-7, GETUTCDATE()) AND timestamp < GETUTCDATE()
-  //         UNION ALL
-  //         SELECT timestamp, author, permlink, -1 as max_accepted_payout, -1 as percent_steem_dollars, -1 as pending_payout_value,TRY_CONVERT(float,REPLACE(reward,'VESTS','')) as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vests_payout, '' as beneficiaries, type='pending_curation' FROM VOCurationRewards WHERE curator=@username AND timestamp >= DATEADD(day,0, GETUTCDATE())
-  //         UNION ALL
-  //         select created, author, permlink, max_accepted_payout, percent_steem_dollars, pending_payout_value,  -1 as reward, -1 as sbd_payout, -1 as steem_payout, -1 as vesting_payout, beneficiaries, 'pending_author' from Comments WHERE author = @username and pending_payout_value > 0 AND created >= DATEADD(day, -7, GETUTCDATE())
-  //         UNION ALL
-  //         SELECT timestamp, author, permlink, -1 as max_accepted_payout, -1 as percent_steem_dollars, -1 as pending_payout_value, -1 as reward, sbd_payout, steem_payout, vesting_payout as vests_payout, '' as beneficiaries, type='pending_benefactor' FROM VOCommentBenefactorRewards WHERE benefactor=@username AND timestamp >= DATEADD(day,0, GETUTCDATE())
-  //       ) as rewards
+        // SELECT [to], [from], memo, timestamp
+        // FROM TxTransfers 
+        // WHERE ([to] = 'steemplus-pay' AND memo LIKE '%premium-feature%' )
+        // OR ([from] = 'steemplus-pay' AND memo LIKE '%premium-feature%' );
   //       ORDER BY timestamp;
   //       `);
   //   })
@@ -46,61 +37,149 @@ exports.debitPremium = () => {
 
   const regexRequestID = /id:([0-9]*)/;
 
+  const accountName = 'lecaillon';
+
   return getJSON(
-    "https://api.myjson.com/bins/amfmi",
+    "https://api.myjson.com/bins/qewwi",
     async function(err, transfers) {
       let requests = transfers.filter(t => t.to === 'steemplus-pay');
       let acks = transfers.filter(t => t.from === 'steemplus-pay');
       
       for(request of requests) {
+        console.log('--------------Start---------------')
+        console.log(request.memo)
+
         let id = request.memo.match(regexRequestID)[1];
-        let price, featureName, feature, user;
+        let price, featureName, feature, user, res;
         let ack = acks.find(function(element) {
           return element.memo.match(regexRequestID)[1] === id;
         });
 
+        if(regexSubscribe.test(request.memo)){
+          // Request is a subscription
+          res = request.memo.match(regexSubscribe);
+        }
+        else if(regexCancelSubscription.test(request.memo)){
+          // Request is a cancelation
+          res = request.memo.match(regexCancelSubscription);
+        }
+        
+        user = await User.findOne({"accountName": request.from});
+        feature = await PremiumFeature.findOne({"name": res[1]});
+
         if(ack === undefined || ack === null){
-          const res = request.memo.match(regexSubscribe);
-          user = await User.findOne({"accountName": request.from});
-          feature = await PremiumFeature.findOne({"name": res[1]});
+          // SteemPlus hasn't answered yet
+          
           if(regexCancelSubscription.test(request.memo)){
             console.log(`send ackCancel to ${request.from} => premium-feature : Subscription for [${res[1]}] has been canceled. id:${res[2]}`);
+            const memo = `premium-feature : Subscription for [${res[1]}] has been canceled. id:${res[2]}`;
+
+            // To test use lecaillon here
+            // steem.broadcast.transfer(KEY,
+            //   accountName,
+            //   accountName,
+            //   "0.001 SBD",
+            //   memo,
+            //   function(err, result) {
+            //     console.log(err, result);
+            //   }
+            // );
+            ack = {
+              "from": "steemplus-pay",
+              "to": "cedricguillas",
+              "memo": memo,
+              "timestamp": utils.formatDate(Date.now())
+            }
           }
           else {
             if(feature.price > user.nbPoints){
               console.log(`create ackNotEnough => premium-feature : Unsufficient number of SPP to use [${res[1]}]. Please get more SPP and try again. id:${res[2]}`);
+              const memo = `premium-feature : Unsufficient number of SPP to use [${res[1]}]. Please get more SPP and try again. id:${res[2]}`;
+
+              // To test use lecaillon here
+              // steem.broadcast.transfer(KEY,
+              //   accountName,
+              //   accountName,
+              //   "0.001 SBD",
+              //   memo,
+              //   function(err, result) {
+              //     console.log(err, result);
+              //   }
+              // );
+              ack = {
+                "from": "steemplus-pay",
+                "to": "cedricguillas",
+                "memo": memo,
+                "timestamp": utils.formatDate(Date.now())
+              }
             }
             else
             {
               console.log(`send ackValid to ${request.from} => premium-feature : ${feature.price} SPP redeemed for [${feature.name}] id:${res[2]}`)
+              const memo = `premium-feature : ${feature.price} SPP redeemed for [${feature.name}] id:${res[2]}`;
+
+              // To test use lecaillon here
+              // steem.broadcast.transfer(KEY,
+              //   accountName,
+              //   accountName,
+              //   "0.001 SBD",
+              //   memo,
+              //   function(err, result) {
+              //     console.log(err, result);
+              //   }
+              // );
+              ack = {
+                "from": "steemplus-pay",
+                "to": "cedricguillas",
+                "memo": memo,
+                "timestamp": utils.formatDate(Date.now())
+              }
             }
           }
-          continue;
         }
 
         if (regexACKValid.test(ack.memo))
         {
-          console.log('ACK OK')
-          const res = ack.memo.match(regexACKValid);
-          price = res[1];
-          featureName = res[2];
+          console.log('ACK OK');
+          let sub = await SubscriptionPremium.findOne({"user": user, "premiumFeature": feature});
+          if(sub === null || sub === undefined){
+            const res = ack.memo.match(regexACKValid);
+            price = res[1];
+            console.log("Add sub to DB");
+          }
+          else if(sub.isCanceled){
+            // Reactivate the feature.
+            console.log('Reactivate feature');
+            sub.isCanceled = false;
+            await sub.save();
+            // Continue with next request so user doesn't pay twice
+            continue;
+          }
+          else {
+            console.log("Nothing to do");
+            continue;
+          }
+          
         }
         else if(regexACKCancel.test(ack.memo))
         {
           // Case cancel
           console.log('ACK Canceled');
+          let sub = await SubscriptionPremium.findOne({"user": user, "premiumFeature": feature});
+          sub.isCanceled = true;
+          await sub.save();
+          continue;
         }
         else if(regexACKNotEnough.test(ack.memo))
         {
           // Case Not enough
           console.log('ACK Not enough');
+          continue;
         }
+
+        
         
         const type = await TypeTransaction.findOne({"name": "Premium Feature"});
-        user = await User.findOne({"accountName": request.from});
-         feature = await PremiumFeature.findOne({
-            name: featureName
-          });
         const amount = price * -1;
 
         let pointsDetail = new PointsDetail({
@@ -128,9 +207,10 @@ exports.debitPremium = () => {
           lastPayment: ack.timestamp,
           isCanceled: false
         });
+        subscriptionPremium = await subscriptionPremium.save();
         user.activeSubscriptions.push(subscriptionPremium);
         await user.save();
-
+        console.log('--------------End---------------')
       }
     }
   );

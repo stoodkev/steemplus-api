@@ -21,6 +21,7 @@ exports.commentNewUser = function(post, lastUpdate, numUsers) {
 };
 
 exports.formatDate = function(string) {
+  string = new Date(string);
   return `${string.getUTCFullYear()}-${string.getUTCMonth() +
     1}-${string.getUTCDate()} ${string.getUTCHours()}:${string.getUTCMinutes()}:${string.getUTCSeconds()}.${string.getUTCMilliseconds()}`;
 };
