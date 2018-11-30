@@ -12,6 +12,10 @@ const sppRouter = function(app) {
   app.get("/premium-feature-list", async function(req, res) {
 	res.status(200).send(await premium.getFeatureList());
   });
+	
+	app.get("/features/:username", async function(req, res) {
+		res.status(200).send(await premium.getUserFeatures(req.params.username));
+	});
 };
 
 module.exports = sppRouter;
