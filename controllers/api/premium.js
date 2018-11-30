@@ -14,6 +14,6 @@ exports.getUserFeatures = async function(username) {
 		.populate({
 			path: "activeSubscriptions", 
 			select: "-_id -user -__v", 
-			populate: {path: "premiumFeature", select: "-_id -__v -price"}
+			populate: {path: "premiumFeature", select: "-_id -__v"}
 		})
 }
