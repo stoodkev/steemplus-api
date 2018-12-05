@@ -49,6 +49,8 @@ const jobRoutes = function(app) {
     growStarted = false;
   });
 
+  // This function is used to pay the weekly rewards to users
+  // Function executed everyday but effective every monday
   app.get("/job/pay-weekly-rewards/:key", async function(req, res) {
     if (req.params.key !== config.key) {
       res.status(403).send("Permission denied");
@@ -151,6 +153,7 @@ const jobRoutes = function(app) {
   });
 
   // Method used to debit SPP for premium features
+  // Function executed every hour
   app.get("/job/debit-premium/:key", async function(req, res) {
     if (req.params.key !== config.key) {
       res.status(403).send("Permission denied");
