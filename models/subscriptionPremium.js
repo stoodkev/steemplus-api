@@ -9,7 +9,8 @@ const SubscriptionPremium = mongoose.model(
       user: { type: Schema.Types.ObjectId, ref: "User" },
       subscriptionDate: Date,
       lastPayment: Date,
-      isCanceled: Boolean
+      isCanceled: Boolean,
+      requestID: String
     },
     { collection: "subscriptionspremium" }
   )

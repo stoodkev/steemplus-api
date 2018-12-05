@@ -50,6 +50,12 @@ exports.addDays = function(date, days) {
   return result;
 }
 
+exports.addHours = function(date, hours) {
+  let result = new Date(date);
+  result.setHours(result.getHours() + hours);
+  return result;
+}
+
 exports.subSeconds = function(date, sec) {
   let result = new Date(date);
   result.setSeconds(result.getUTCSeconds() - sec);
