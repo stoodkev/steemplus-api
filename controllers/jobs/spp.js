@@ -1,6 +1,7 @@
 const config = require("../../config.js");
 const sql = require("mssql");
 const steem = require("steem");
+const spp = require("./spp");
 const utils = require("../../utils.js");
 const User = require("../../models/user.js");
 const PointsDetail = require("../../models/pointsDetail.js");
@@ -22,6 +23,146 @@ function subDays(date, days) {
   let result = new Date(date);
   result.setDate(result.getDate() - days);
   return result;
+}
+
+
+// Function used to calculate weekly reward for users.
+// Weekly rewards depend on users rank and on the total of points created during the week.
+// We decided to give away 10% of the weekly total
+// Users get rewards if they are in the top 10
+exports.weeklyRewards = async function(startWeek, endWeek) {
+  const userNotIncluded = await User.find({"accountName": {$in :["stoodkev", "steem-plus"]}});
+  const delegationType = await TypeTransaction.findOne({"name": "Delegation"});
+  const reblogType = await TypeTransaction.findOne({"name": "Reblog"});
+  const weeklyRewardType = await TypeTransaction.findOne({"name": "Weekly Reward"});
+
+  // Rewards for top 10
+  // Ex : 
+  // 1st place 50% of the pool
+  // 2nd place 25% of the pool
+  // 3rd place 12.5% of the pool
+  // ...
+  const percentageReward = [50, 25, 12.5, 6.25, 3.13, 1.56, 0.78, 0.39, 0.24, 0.15];
+
+  // MongoDB query creation for ranking
+  const weeklyQuery = [
+    { "$match": { "typeTransaction": { $nin: [delegationType._id, reblogType._id, weeklyRewardType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
+    { "$group": 
+      { 
+        "_id": "$user",
+        points: {
+          $sum: "$nbPoints"
+        }
+      }
+    },
+    {
+      $sort: { points: -1 }
+    },
+    {
+      $limit: 10
+    }
+  ]
+
+  const tmpUsers = await User.populate(await PointsDetail.aggregate(weeklyQuery).exec(), {path: "_id", select: 'accountName'});
+
+  // MongoDB query creation for total points
+  const totalPointQuery = [
+    { "$match": { "typeTransaction": { $nin: [delegationType._id, reblogType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
+    { "$group": 
+      { 
+        "_id": null,
+        points: {
+          $sum: "$nbPoints"
+        }
+      }
+    },
+  ]
+  // Execute query
+  const tmpPoints = await User.populate(await PointsDetail.aggregate(totalPointQuery).exec(), {path: "_id", select: 'accountName'});
+  // Total point of the week
+  const totalPointsWeek = tmpPoints[0].points;
+  // Calculate pool (10%)
+  const totalPointsRewards = totalPointsWeek * 10.0 / 100.0;
+  let rankingRes = [];
+  // Create result
+  tmpUsers.forEach((user, index) => {
+    let nbPointsUser = percentageReward[index] * totalPointsRewards / 100.00;
+    rankingRes.push({
+      rank: index + 1,
+      accountName: user._id.accountName,
+      nbPoints: nbPointsUser.toFixed(2)
+    });
+  });
+  // return result
+  return {
+    ranking: rankingRes,
+    totalPointsWeek: totalPointsWeek,
+    totalPointsRewards: totalPointsRewards,
+    endWeek: endWeek
+  }
+};
+
+exports.payWeeklyRewards = async function() {
+  const dateNow = Date.now();
+  let previousMonday, nextSunday, endWeek, startWeek;
+  // Get the last entry the requestType 4 (Reblogs)
+  let lastEntry = await PointsDetail.find({
+    requestType: 5
+  })
+  .sort({
+    timestamp: -1
+  })
+  .limit(1);
+
+  // Get the creation date of the last entry
+  if (lastEntry[0] !== undefined){
+    // Get date of the currentWeek
+    previousMonday = utils.getLastWeekday(new Date(), 1);
+    nextSunday = utils.addDays(previousMonday , 6);
+    // Get only current week spp per user excluding delegations
+    endWeek = new Date(Date.UTC(nextSunday.getUTCFullYear(), nextSunday.getUTCMonth(), nextSunday.getUTCDate(), 23, 59, 59, 999));
+    startWeek = new Date(Date.UTC(previousMonday.getUTCFullYear(), previousMonday.getUTCMonth(), previousMonday.getUTCDate(), 0, 0, 0, 0));
+  }
+  else {
+    // This date is the steemplus point annoncement day + 7 days for rewards because rewards come after 7 days.
+    // Wait for SteemSQL's query result before starting the second request
+    // We decided to wait to be sure this function won't try to update the same row twice at the same time
+    endWeek = new Date(Date.UTC(2018, 10, 18, 23, 59, 59, 999));
+    startWeek = new Date(Date.UTC(2018, 10, 12, 0, 0, 0, 0));
+  }
+
+  while(dateNow > endWeek)
+  {
+    console.log(`Getting rewards from ${startWeek.toUTCString()} to ${endWeek.toUTCString()}`);
+    const rewards = await spp.weeklyRewards(startWeek, endWeek);
+    for(reward of rewards.ranking){
+      const date = new Date(endWeek);
+      const weeklyRewardType = await TypeTransaction.findOne({"name": "Weekly Reward"});
+      let user = await User.findOne({accountName: reward.accountName});
+      let pointsDetail = new PointsDetail({
+        nbPoints: parseFloat(reward.nbPoints),
+        amount: parseFloat(reward.nbPoints),
+        amountSymbol: "SP",
+        permlink: "",
+        user: user._id,
+        typeTransaction: weeklyRewardType._id,
+        timestamp: date,
+        timestampString: utils.formatDate(date),
+        requestType: 5 // Request type 5 is for Weekly Rewards.
+      });
+      pointsDetail = await pointsDetail.save();
+
+      // Update user account
+      console.log(user.accountName, 'old Points ', user.nbPoints);
+      user.pointsDetails.push(pointsDetail);
+      user.nbPoints += parseFloat(reward.nbPoints);
+      await user.save();
+      console.log(user.accountName, 'new Points ', user.nbPoints);
+    }
+    startWeek = addDays(startWeek, 7);
+    endWeek = addDays(endWeek, 7);
+  }
+  console.log(`Rejected : week from ${startWeek.toUTCString()} to ${endWeek.toUTCString()} not finished`);
 }
 
 // Function used to credit account for delegations
@@ -324,19 +465,12 @@ async function updateSteemplusPointsComments(comments) {
     let totalVests = jsonPrice.totalVests;
 
     // Get the amount of the transaction
-    let amount = (
-      (steem.formatter
-        .vestToSteem(parseFloat(comment.vesting_payout), totalVests, totalSteem)
-        .toFixed(3) +
-        parseFloat(comment.steem_payout)) *
-      ratioSBDSteem +
-      parseFloat(comment.sbd_payout)
-    ).toFixed(3);
+    let amount = ((steem.formatter.vestToSteem(parseFloat(comment.vesting_payout), totalVests, totalSteem) + parseFloat(comment.steem_payout) * ratioSBDSteem + parseFloat(comment.sbd_payout)));
     // Get the number of Steemplus points
     let nbPoints = amount * 100;
     let pointsDetail = new PointsDetail({
-      nbPoints: nbPoints,
-      amount: amount,
+      nbPoints: nbPoints.toFixed(3),
+      amount: amount.toFixed(3),
       amountSymbol: "SP",
       permlink: comment.permlink,
       url: comment.url,

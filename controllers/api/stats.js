@@ -2,21 +2,10 @@ const User = require("../../models/user.js");
 const PointsDetail = require("../../models/pointsDetail.js");
 const TypeTransaction = require("../../models/typeTransaction.js");
 const utils = require("../../utils.js");
+const delegations = require("./delegations.js");
+const steem = require("steem");
 
 
-// Function used to add a given number of days
-function addDays(date, days) {
-  let result = new Date(date);
-  result.setDate(result.getDate() + days);
-  return result;
-}
-
-// FUnction used to substract a given number of days
-function subDays(date, days) {
-  let result = new Date(date);
-  result.setDate(result.getDate() - days);
-  return result;
-}
 
 // Function used to get statistics about SPP :
 // - Total amount delivered
@@ -136,7 +125,7 @@ exports.getSppStats = async function() {
   result.points_per_transaction_day = ppt_day;
   const total_day_exclusive = ppt_day
     .reduce(function(a, b) {
-      return (b.type == "Delegation"||b.type=="Reblog" )? a : a + parseFloat(b.points);
+      return (b.type == "Delegation"||b.type=="Reblog"||b.type=="Weekly Reward" )? a : a + parseFloat(b.points);
     }, 0)
     .toFixed(3);
 
@@ -157,11 +146,14 @@ exports.getRankings = async function() {
   let result = {};
   let tmp = null;
   let dateNow = new Date();
+  const userNotIncluded = await User.find({"accountName": {$in :["stoodkev", "steem-plus", "steemplus-pay"]}});
 
   const delegationType = await TypeTransaction.findOne({"name": "Delegation"});
+  const reblogType = await TypeTransaction.findOne({"name": "Reblog"});
+  const weeklyRewardType = await TypeTransaction.findOne({"name": "Weekly Reward"});
   // Get rewards of all time per user excluding delegations.
   const foreverQuery = [
-    { "$match": { "typeTransaction": { $nin: [delegationType._id] } } },
+    { "$match": { "user": { $nin: userNotIncluded.map(u => u._id)} } },
     { "$group": 
       { 
         "_id": "$user",
@@ -175,7 +167,8 @@ exports.getRankings = async function() {
     }
   ];
   tmp = await User.populate(await PointsDetail.aggregate(foreverQuery).exec(), {path: "_id", select: 'accountName'});
-  tmp.map(entry => {
+  tmp.map((entry, index) => {
+    entry.rank = index + 1;
     entry.name = entry._id.accountName;
     delete entry._id;
   });
@@ -183,7 +176,7 @@ exports.getRankings = async function() {
 
   // Get only current month spp per user excluding delegations
   const monthlyQuery = [
-    { "$match": { "typeTransaction": { $nin: [delegationType._id] }, timestamp: { '$gte' : new Date(`${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth() + 1}-01T00:00:00.000Z`) } } },
+    { "$match": { timestamp: { '$gte' : new Date(`${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth() + 1}-01T00:00:00.000Z`) }, "user": { $nin: userNotIncluded.map(u => u._id)} } },
     { "$group": 
       { 
         "_id": "$user",
@@ -197,20 +190,22 @@ exports.getRankings = async function() {
     }
   ]
   tmp = await User.populate(await PointsDetail.aggregate(monthlyQuery).exec(), {path: "_id", select: 'accountName'});
-  tmp.map(entry => {
+  tmp.map((entry, index) => {
+    entry.rank = index + 1;
     entry.name = entry._id.accountName;
     delete entry._id;
   });
   result.monthly = tmp;
 
-  // Get only current month spp per user excluding delegations
-  const weekNumber = utils.weekNumber(dateNow) - 1;
-  let startWeek = new Date(Date.UTC(dateNow.getUTCFullYear(), 0, 1, 0, 0, 0))
-  let endWeek = new Date(Date.UTC(dateNow.getUTCFullYear(), 0, 8, 0, 0, 0))
-  startWeek = addDays(startWeek, weekNumber*7);
-  endWeek = addDays(endWeek, weekNumber*7);
+  const previousMonday = utils.getLastWeekday(new Date(), 1);
+  const nextSunday = utils.addDays(previousMonday , 6);
+
+  // Get only current week spp per user excluding delegations
+  const endWeek = new Date(Date.UTC(nextSunday.getUTCFullYear(), nextSunday.getUTCMonth(), nextSunday.getUTCDate(), 23, 59, 59, 999));
+  const startWeek = new Date(Date.UTC(previousMonday.getUTCFullYear(), previousMonday.getUTCMonth(), previousMonday.getUTCDate(), 0, 0, 0, 0));
+ 
   const weeklyQuery = [
-    { "$match": { "typeTransaction": { $nin: [delegationType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek} } },
+    { "$match": { "typeTransaction": { $nin: [delegationType._id, reblogType._id, weeklyRewardType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
     { "$group": 
       { 
         "_id": "$user",
@@ -224,10 +219,48 @@ exports.getRankings = async function() {
     }
   ]
   tmp = await User.populate(await PointsDetail.aggregate(weeklyQuery).exec(), {path: "_id", select: 'accountName'});
-  tmp.map(entry => {
+
+  const totalWeekPointsQuery = [
+    { "$match": { "typeTransaction": { $nin: [delegationType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
+    { "$group": 
+      { 
+        "_id": null,
+        points: {
+          $sum: "$nbPoints"
+        }
+      }
+    }
+  ]
+  const totalPointsResponse = await PointsDetail.aggregate(totalWeekPointsQuery).exec();
+  const totalPoints = totalPointsResponse[0].points * 10 / 100.00;
+  const rewardsPercentage = [50, 25, 12.5, 6.25, 3.13, 1.56, 0.78, 0.39, 0.24, 0.15]
+  tmp.map((entry, index) => {
+    entry.rank = index + 1;
     entry.name = entry._id.accountName;
+    let percentage = (index >= 10 ? 0 : rewardsPercentage[index]);
+    entry.estimatedReward = totalPoints * percentage / 100;
     delete entry._id;
   });
+  result.endDate = endWeek;
   result.weekly = tmp;
+
+  // Get delegations ranking
+  tmp = await delegations.getIncomingRanking("steem-plus");
+  let globalProperties = await steem.api.getDynamicGlobalPropertiesAsync()
+  .then(function(values) 
+  {
+    totalSteem = Number(values.total_vesting_fund_steem.split(" ")[0]);
+    totalVests = Number(values.total_vesting_shares.split(" ")[0]);
+    return {totalSteem: totalSteem, totalVests: totalVests};
+  });
+
+  tmp.sort(function(a, b){return b.vesting_shares - a.vesting_shares});
+  tmp.map((entry, index) => {
+    entry.rank = index + 1;
+    entry.sp = steem.formatter.vestToSteem(parseFloat(entry.vesting_shares), globalProperties.totalVests, globalProperties.totalSteem).toFixed(2);
+    delete entry.vesting_shares;
+    delete entry.delegation_date;
+  });
+  result.delegations = tmp;
   return result;
 }

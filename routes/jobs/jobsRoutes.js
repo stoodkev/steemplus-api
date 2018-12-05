@@ -12,6 +12,7 @@ let payDelegationsStarted = false;
 let growStarted = false;
 let updateSteemplusPointsStarted = false;
 let botVoteStarted = false;
+let weeklyRewardsStarted = false;
 let postStatsStarted = false;
 
 const jobRoutes = function(app) {
@@ -44,6 +45,21 @@ const jobRoutes = function(app) {
     res.status(200).send("OK");
     await steemplusPay.grow();
     growStarted = false;
+  });
+
+  app.get("/job/pay-weekly-rewards/:key", async function(req, res) {
+    if (req.params.key !== config.key) {
+      res.status(403).send("Permission denied");
+      return;
+    }
+    if(weeklyRewardsStarted) {
+      res.status(403).send("Weekly rewards already started");
+      return;
+    }
+    weeklyRewardsStarted = true;
+    res.status(200).send("OK");
+    await spp.payWeeklyRewards();
+    weeklyRewardsStarted = false;
   });
 
   // This function is used to update steemplus point.

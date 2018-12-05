@@ -1,15 +1,10 @@
 
 const statsController = require("../api/stats.js");
 const utils = require("../../utils.js");
+const steem = require("steem");
+const config = require("../../config.js");
+var getJSON = require('get-json');
 
-var fs = require('fs');
-var JSDOM = require('jsdom').JSDOM;
-var jsdom = new JSDOM('<body><div id="container" style="width: 100%;height: 100%;margin: 50px;padding: 50px;"></div></body>', {runScripts: 'dangerously'});
-require('dotenv').config();
-var window = jsdom.window;
-
-var anychart = require('anychart')(window);
-var anychartExport = require('anychart-nodejs')(anychart);
 
 exports.getPostStats = async function () {
   const stats=await statsController.getSppStats();
@@ -27,45 +22,89 @@ exports.getPostStats = async function () {
   }
   body+="</table>\
   <br>\
-  <h3>Distribution per type</h3>";
+  <h3>Distribution per type</h3>\
+  <p>This donut chart shows which categories earn the most SPP (in percentage).</p>"
   // create a chart and set the data
   let data=stats.points_per_transaction.map(function(a){return {x:a.type,value:a.points};});
-  let chart = anychart.pie(data);
-  chart.title("Distribution of SPP per type");
-  console.log("test1");
-  chart.bounds(0, 0, 800, 600);
-  console.log("test2");
-  // set the container id
-  chart.container("container");
-  console.log("test3");
-  chart.labels().position("outside");
-  console.log("test4");
-  chart.legend().paginator(false);
-  console.log("test5");
-  chart.legend().itemsLayout('horizontal-expandable');
-  console.log("test6");
-  chart.legend().maxWidth("600");
-  console.log("test7");
-  // initiate drawing the chart
-  chart.draw();
-  console.log("test8");
-  // generate JPG image and save it to a file
-  const image= await anychartExport.exportTo(chart, 'jpg');
-  console.log("test9");
-  const fs_error=await fs.writeFile('public/distribution_per_type.jpg',image);
-  console.log("test10");
-  body+="<br><img src='"+config.serverURL+"/distribution_per_type.jpg'/>";
+  let chd = [];
+  let chdl = [];
+  let chl = [];
+
+  let total = 0;
+  for(d of data){
+    total += parseFloat(d.value);
+  }
+  console.log(total);
+  for(d of data){
+    chd.push(parseFloat(d.value));
+    chl.push((parseFloat(d.value)/total*100).toFixed(0));
+    chdl.push(d.x);
+  }
+  let url = `https://image-charts.com/chart?cht=pd&chs=600x600&chd=a:${chd.join(',')}&chdl=${chdl.join('|')}&chl=${chl.join('|')}&chco=380474|7171C6|3300FF|6666FF|836FFF|0276FD|0198E1|00B2EE|87CEFA|C6E2FF|BFEFFF`
+
+  const daily=await getDailyUsers();
+  body+="<br><img src='"+url+"'/>";
   body+="<br><h3>How to earn SPP?</h3><br>\
   <p>If you are already using SteemPlus, youcan find detailed explanations about how to earn SPP from your wallet, by clicking on the arrow near your\
-  SteemPlus Points balance and clicking on \'How to earn SPP?\'</p>\
+  SteemPlus Points balance and clicking on \'How to earn SPP?\' or on the SPP tab of our <a href='https://steemplus.app'>landing page</a></p>\
   https://steemitimages.com/0x0/https://cdn.steemitimages.com/DQmVFgYEKvhEwqZ4TRvARA7bCTxia2U3ALciPzDENMT5yJV/image.png\
   <h3>Not on SteemPlus yet?</h3><br>\
-  <p>SteemPlus is a Chrome, Opera and Firefox extension used by "+await getDailyUsers().chrome+" users daily.<br>It brings over 30 novel features to your Steem experience on Steemit and Busy.\
-  As you can see above, you can also earn SPP by performing certain actions. This will allow you to redeem your SPP for premium features or hold them against @steem-plus upvotes.</p>\
-  <p>You can download and install SteemPlus directly from the Chrome Store if you are using Chrome or Firefox(follow <a href='https://chrome.google.com/webstore/detail/steemplus/mjbkjgcplmaneajhcbegoffkedeankaj?hl=en'>this link</a> for Chrome, <a href='https://addons.mozilla.org/en-US/firefox/addon/steem-plus/'>this one</a> for Firefox ).<br>\
-  For installation procedures on Opera, please check our <a href='https://github.com/stoodkev/SteemPlus/blob/master/README.md'>documentation</a>.</p>";
-/*  steem.broadcast.comment(KEY, "", "steemplus", "lecaillon", "spp-stats-"+Date.now(), title, body, {}, function(err, result) {
-    console.log(err, result);
-  });*/
+  <p>SteemPlus is a Chrome, Opera and Firefox extension used by "+daily.total+" users daily.<br>\
+  It brings over 30 novel features to your Steem experience on Steemit, Busy and Steem Monsters.\
+  As you can see above, you can also earn SPP by performing certain actions. This will allow you to redeem your SPP for premium features or hold them to receive daily @steem-plus upvotes.</p>\
+  <p>To check all our awesome features and download the extension, please visit our <a href='https://steemplus.app'>landing page</a>.</p>";
+
+  const dateNow = new Date();
+  const permlink = `spp-stats-${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth() + 1}-${dateNow.getUTCDate()}`;
+  // const author = "steem-plus";
+  const author = "steem-plus";
+  const operations = [
+    ['comment',
+      {
+        parent_author: '',
+        parent_permlink: 'steemplus',
+        author: author,
+        permlink: permlink,
+        title: title,
+        body: body,
+        json_metadata : JSON.stringify({
+          tags: ["steemplus", "dev", "stats", "news", "fundition-6om5dpvkb"],
+          app: 'steem-plus-app'
+        })
+      }
+    ],
+    ['comment_options',
+      {
+        author: author,
+        permlink: permlink,
+        max_accepted_payout: '100000.000 SBD',
+        percent_steem_dollars: 0,
+        allow_votes: true,
+        allow_curation_rewards: true,
+        extensions: [
+        ]
+      }
+    ]
+  ];
+  console.log(operations)
+  steem.broadcast.send({ operations: operations, extensions: [] }, { posting: process.env.WIF },function(e, r){console.log(e,r)});
+
   return(title+body);
 };
+
+// get daily users on Chrome Store
+function getDailyUsers(){
+  const chromeExtensionWebstoreURL = 'https://chrome.google.com/webstore/detail/steemplus/mjbkjgcplmaneajhcbegoffkedeankaj?hl=en';
+  const firefoxExtensionWebstoreURL= 'https://addons.mozilla.org/en-US/firefox/addon/steem-plus/?src=search';
+  return new Promise(function(fulfill,reject){
+    getJSON('http://www.whateverorigin.org/get?url=' + encodeURIComponent(chromeExtensionWebstoreURL),function(e,response){
+      const users=response.contents.match(/<Attribute name=\"user_count\">([\d]*?)<\/Attribute>/)[1];
+      getJSON('http://www.whateverorigin.org/get?url=' + encodeURIComponent(firefoxExtensionWebstoreURL),function(e,firefox){
+        const users_firefox=firefox.contents.match(/<dd class=\"MetadataCard-content\">([/\d]*?)<\/dd>/)[1];
+        console.log(users);
+        console.log({chrome:users,firefox:users_firefox,total:parseInt(users)+parseInt(users_firefox)});
+        fulfill({chrome:users,firefox:users_firefox,total:parseInt(users)+parseInt(users_firefox)});
+      });
+    });
+  });
+}

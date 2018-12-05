@@ -26,15 +26,41 @@ exports.formatDate = function(string) {
 };
 
 exports.weekNumber = function(dt) {
-  var tdt = new Date(dt.valueOf());
-  var dayn = (dt.getDay() + 6) % 7;
-  tdt.setDate(tdt.getDate() - dayn + 3);
-  var firstThursday = tdt.valueOf();
-  tdt.setMonth(0, 1);
-  if (tdt.getDay() !== 4) 
-    tdt.setMonth(0, 1 + ((4 - tdt.getDay()) + 7) % 7);
+  let tdt = new Date(dt.valueOf());
+  let dayn = (dt.getUTCDay() + 6) % 7;
+  tdt.setDate(tdt.getUTCDate() - dayn + 3);
+  let firstThursday = tdt.valueOf();
+  tdt.getUTCMonth(0, 1);
+  if (tdt.getUTCDay() !== 4) 
+    tdt.getUTCMonth(0, 1 + ((4 - tdt.getUTCDay()) + 7) % 7);
   return 1 + Math.ceil((firstThursday - tdt) / 604800000); 
 };
+
+exports.getLastWeekday = function ( date , weekday ) { // 0 = sunday, 1 = monday, ... , 6 = saturday
+    var d = new Date(date);
+    d.setDate( d.getDate() + weekday - d.getDay() ); // move to last of given weekday
+    return d;
+}
+
+// Function used to add a given number of days
+exports.addDays = function(date, days) {
+  let result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+exports.subSeconds = function(date, sec) {
+  let result = new Date(date);
+  result.setSeconds(result.getUTCSeconds() - sec);
+  return result;
+}
+
+// FUnction used to substract a given number of days
+exports.subDays = function(date, days) {
+  let result = new Date(date);
+  result.setDate(result.getDate() - days);
+  return result;
+}
 
 exports.commentVotingBot = function(post) {
   let commentBody = `Hi, @${post.author}!\n\n`;
