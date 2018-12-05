@@ -92,6 +92,9 @@ exports.debitPremium = async function() {
         console.log(request.memo)
 
         let id = request.memo.match(regexRequestID)[1];
+        let ack = acks.find(function(element) {
+          return element.memo.match(regexRequestID)[1] === id;
+        });
         let price, featureName, feature, user, res;
         if(regexSubscribe.test(request.memo)){
           // Request is a subscription
