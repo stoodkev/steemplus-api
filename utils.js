@@ -21,6 +21,7 @@ exports.commentNewUser = function(post, lastUpdate, numUsers) {
 };
 
 exports.formatDate = function(string) {
+  string = new Date(string);
   return `${string.getUTCFullYear()}-${string.getUTCMonth() +
     1}-${string.getUTCDate()} ${string.getUTCHours()}:${string.getUTCMinutes()}:${string.getUTCSeconds()}.${string.getUTCMilliseconds()}`;
 };
@@ -46,6 +47,12 @@ exports.getLastWeekday = function ( date , weekday ) { // 0 = sunday, 1 = monday
 exports.addDays = function(date, days) {
   let result = new Date(date);
   result.setDate(result.getDate() + days);
+  return result;
+}
+
+exports.addHours = function(date, hours) {
+  let result = new Date(date);
+  result.setHours(result.getHours() + hours);
   return result;
 }
 

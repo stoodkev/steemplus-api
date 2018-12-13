@@ -67,7 +67,7 @@ exports.weeklyRewards = async function(startWeek, endWeek) {
 
   // MongoDB query creation for total points
   const totalPointQuery = [
-    { "$match": { "typeTransaction": { $nin: [delegationType._id, reblogType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
+    { "$match": { "typeTransaction": { $nin: [delegationType._id, reblogType._id, weeklyRewardType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
     { "$group": 
       { 
         "_id": null,

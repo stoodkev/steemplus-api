@@ -7,7 +7,8 @@ const User = mongoose.model(
     {
       accountName: { type: String, unique: true },
       nbPoints: Number,
-      pointsDetails: [{ type: Schema.Types.ObjectId, ref: "PointsDetail" }]
+      pointsDetails: [{ type: Schema.Types.ObjectId, ref: "PointsDetail" }],
+      activeSubscriptions: [{ type: Schema.Types.ObjectId, ref: "SubscriptionPremium" }]
     },
     { collection: "users" }
   )

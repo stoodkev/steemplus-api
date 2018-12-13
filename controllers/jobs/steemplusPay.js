@@ -54,21 +54,21 @@ exports.grow = async function() {
     } else console.log("Nothing to Power Up!");
     steemPlusPay = await steem.api.getAccountsAsync(["steemplus-pay"]);
     let priceSBDUSB = await utils.getSBDPriceUSD();
-    if (
-      parseFloat(steemPlusPay[0].sbd_balance.split(" ")[0]) >= 10 &&
-      priceSBDUSB <= 0.99
-    ) {
-      await steem.broadcast.convertAsync(
-        config.payActKey,
-        "steemplus-pay",
-        parseInt(utils.generateRandomString(7)),
-        steemPlusPay[0].sbd_balance
-      );
-      console.log("Starting conversion of " + steemPlusPay[0].sbd_balance);
-    } else
-      console.log(
-        "Not enough SBD to convert! (" + steemPlusPay[0].sbd_balance + ")"
-      );
+    // if (
+    //   parseFloat(steemPlusPay[0].sbd_balance.split(" ")[0]) >= 10 &&
+    //   priceSBDUSB <= 0.99
+    // ) {
+    //   await steem.broadcast.convertAsync(
+    //     config.payActKey,
+    //     "steemplus-pay",
+    //     parseInt(utils.generateRandomString(7)),
+    //     steemPlusPay[0].sbd_balance
+    //   );
+    //   console.log("Starting conversion of " + steemPlusPay[0].sbd_balance);
+    // } else
+    //   console.log(
+    //     "Not enough SBD to convert! (" + steemPlusPay[0].sbd_balance + ")"
+    //   );
 
 
     const globalProperties = await steem.api.getDynamicGlobalPropertiesAsync();

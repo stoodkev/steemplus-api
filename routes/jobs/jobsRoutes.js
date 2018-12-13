@@ -2,6 +2,7 @@ const config = require("../../config.js");
 const spp = require("../../controllers/jobs/spp.js");
 const vote = require("../../controllers/jobs/vote.js");
 const poststats = require("../../controllers/jobs/poststats.js");
+const premium = require("../../controllers/jobs/premium.js");
 const steemplusPay = require("../../controllers/jobs/steemplusPay.js");
 const utils = require("../../utils.js");
 const steem = require("steem");
@@ -14,6 +15,7 @@ let updateSteemplusPointsStarted = false;
 let botVoteStarted = false;
 let weeklyRewardsStarted = false;
 let postStatsStarted = false;
+let debitPremiumStarted = false;
 
 const jobRoutes = function(app) {
   // Method used to give user rewards depending on delegations
@@ -47,6 +49,8 @@ const jobRoutes = function(app) {
     growStarted = false;
   });
 
+  // This function is used to pay the weekly rewards to users
+  // Function executed everyday but effective every monday
   app.get("/job/pay-weekly-rewards/:key", async function(req, res) {
     if (req.params.key !== config.key) {
       res.status(403).send("Permission denied");
@@ -75,14 +79,11 @@ const jobRoutes = function(app) {
       res.status(403).send("Update Steemplus Points already started");
       return;
     }
-    console.log(updateSteemplusPointsStarted);
     updateSteemplusPointsStarted = true;
-    console.log(updateSteemplusPointsStarted);
     res.status(200).send("OK");
     await spp.updateSteemplusPoints();
     console.log("Finished")
     updateSteemplusPointsStarted = false;
-    console.log(updateSteemplusPointsStarted);
   });
 
   // Bot for Steemplus daily vote
@@ -149,6 +150,23 @@ const jobRoutes = function(app) {
     postStatsStarted = true;
     res.status(200).send(await poststats.getPostStats());
     postStatsStarted = false;
+  });
+
+  // Method used to debit SPP for premium features
+  // Function executed every hour
+  app.get("/job/debit-premium/:key", async function(req, res) {
+    if (req.params.key !== config.key) {
+      res.status(403).send("Permission denied");
+      return;
+    }
+    if(debitPremiumStarted) {
+      res.status(403).send("Debit premium already started");
+      return;
+    }
+    debitPremiumStarted = true;
+    res.status(200).send("OK");
+    await premium.debitPremium();
+    debitPremiumStarted = false;
   });
 };
 
