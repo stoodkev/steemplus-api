@@ -8,7 +8,7 @@ var getJSON = require('get-json');
 
 exports.getPostStats = async function () {
   const stats=await statsController.getSppStats();
-  const title="Daily SteemPlus Stats - "+(new Date(Date.now()).toLocaleString().split(" ")[0]).replace("-","/").replace("-","/");
+  const title="Daily SteemPlus Stats - "+(new Date(Date.now()).toLocaleString().split(" ")[0]).replace("-","/").replace(",","");
   let body = "<div>https://cdn.steemitimages.com/DQmdUeahavHxrpFve3xXjTLNxkTuNeNiHxKwhBjciANZwNk/image.png <br><br>\
   <p>Welcome to this daily edition of the SteemPlus Stats. This post aims to give you all the information you need about the current distribution of the SteemPlus Points.<br>\
   You will find the Top 20 users and their SPPs, the distribution per category and total SPPs distributed. If you'd like to see more information, please let us know on <a href='https://discord.gg/96JkJSy'>Discord</a>.</p> \
