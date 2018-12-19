@@ -24,7 +24,8 @@ let config={
   wif_bot:process.env.WIF_BOT,
   key:process.env.MASTER,
   payPostKey:process.env.PAY_POST_KEY,
-  payActKey:process.env.PAY_ACT_KEY
+  payActKey:process.env.PAY_ACT_KEY,
+  sp_act:process.env.SP_ACT
 }
 
 module.exports=config;

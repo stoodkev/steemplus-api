@@ -9,7 +9,7 @@ const TypeTransaction = require("../../models/typeTransaction.js");
 const SubscriptionPremium = require("../../models/subscriptionPremium.js");
 const User = require("../../models/user.js");
 
-exports.debitPremium = async function() { 
+exports.debitPremium = async function() {
 
   // Create all the regex needed to analyse the memo
 
@@ -25,7 +25,7 @@ exports.debitPremium = async function() {
 
   const regexRequestID = /id:([0-9]*)/;
 
-  const accountName = 'steemplus-pay';
+  const accountName = 'steem-plus';
 
   // Templates to create memo
   memoACKValidTemplate = (price, featureName, requestID) => {
@@ -55,20 +55,20 @@ exports.debitPremium = async function() {
   if (lastEntry[0] !== undefined)
     lastEntryDate = lastEntry[0].timestampString;
   else lastEntryDate = "2018-12-05 12:05:42.000"; // This date is the steemplus point annoncement day + 7 days for rewards because rewards come after 7 days.
-    
+
   // Execute query on SteemSQL database
   return new sql.ConnectionPool(config.config_api)
     .connect()
     .then(pool => {
       return pool.request().query(`
         SELECT [to], [from], memo, timestamp
-        FROM TxTransfers 
-        WHERE 
+        FROM TxTransfers
+        WHERE
           timestamp > CONVERT(datetime, '${lastEntryDate}')
         AND
         (
             ([to] = '${accountName}' AND memo LIKE '%Premium Feature%' )
-          OR 
+          OR
             ([from] = '${accountName}' AND memo LIKE '%Premium Feature%' )
         )
         AND ([to] != [from])
@@ -88,7 +88,7 @@ exports.debitPremium = async function() {
 
       // For each request
       for(request of requests) {
-        
+
         // Get the id of the request
         let id = request.memo.match(regexRequestID)[1];
         // Try to find the matching ack
@@ -97,7 +97,7 @@ exports.debitPremium = async function() {
         });
 
         let price, featureName, feature, user, res;
-        
+
         if(regexSubscribe.test(request.memo)){
           // Request is a subscription
           res = request.memo.match(regexSubscribe);
@@ -106,11 +106,11 @@ exports.debitPremium = async function() {
           // Request is a cancelation
           res = request.memo.match(regexCancelSubscription);
         }
-        
+
         // Get user and feature for request
         user = await User.findOne({"accountName": request.from});
         feature = await PremiumFeature.findOne({"name": res[1]});
-        
+
         // If ack is undefined or null it means Steemplus hasn't reply yet
         if(ack === undefined || ack === null){
           // SteemPlus hasn't answered yet
@@ -118,8 +118,8 @@ exports.debitPremium = async function() {
           if(regexCancelSubscription.test(request.memo)){
             // if type is cancelation send cancelation memo
             const memo = memoACKCancelTemplate(res[1], res[2]);
-          
-            steem.broadcast.transfer(config.payActKey,
+
+            steem.broadcast.transfer(config.sp_act,
               accountName,
               request.from,
               "0.001 SBD",
@@ -146,7 +146,7 @@ exports.debitPremium = async function() {
               const memo = memoACKNotEnoughtTemplate(res[1], res[2]);
 
               // To test use lecaillon here
-              steem.broadcast.transfer(config.payActKey,
+              steem.broadcast.transfer(config.sp_act,
                 accountName,
                 request.from,
                 "0.001 SBD",
@@ -170,7 +170,7 @@ exports.debitPremium = async function() {
               console.log(`send ackValid to ${request.from} => Premium Feature : ${feature.price} SPP redeemed for [${feature.name}] id:${res[2]}`)
               const memo = memoACKValidTemplate(feature.price, feature.name, res[2]);
 
-              steem.broadcast.transfer(config.payActKey,
+              steem.broadcast.transfer(config.sp_act,
                 accountName,
                 request.from,
                 "0.001 SBD",
@@ -191,7 +191,7 @@ exports.debitPremium = async function() {
 
         // Add requestID to ack
         ack.requestID = id;
-  
+
         // Check type
         if (regexACKValid.test(ack.memo))
         {
@@ -215,7 +215,7 @@ exports.debitPremium = async function() {
             console.log("Nothing to do");
             continue;
           }
-          
+
         }
         else if(regexACKCancel.test(ack.memo))
         {
@@ -233,7 +233,7 @@ exports.debitPremium = async function() {
           continue;
         }
 
-        
+
         // Finally create the transaction in DB
         const type = await TypeTransaction.findOne({"name": "Premium Feature"});
         const amount = price * -1;
@@ -276,7 +276,7 @@ exports.debitPremium = async function() {
         const type = await TypeTransaction.findOne({"name": "Premium Feature"});
         let user = await User.findOne({"_id": subscription.user._id});
         let feature = await PremiumFeature.findOne({"_id": subscription.premiumFeature._id});
-        
+
         const amount = feature.price * -1;
 
         // Create point detail for renew
@@ -297,12 +297,12 @@ exports.debitPremium = async function() {
         user.pointsDetails.push(pointsDetail);
         user.nbPoints = parseFloat(user.nbPoints) + amount;
         await user.save();
-        
+
         subscription.lastPayment = ackRenew.timestamp;
         await subscription.save();
 
       }
-      
+
       // Check auto renew
       let subList = await SubscriptionPremium.find({});
       const dateNow = new Date();
@@ -359,4 +359,3 @@ exports.debitPremium = async function() {
       sql.close();
     });
 };
-
