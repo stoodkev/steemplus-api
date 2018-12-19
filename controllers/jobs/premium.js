@@ -235,6 +235,8 @@ exports.debitPremium = async function() {
 
 
         // Finally create the transaction in DB
+        if(!user) continue;
+        
         const type = await TypeTransaction.findOne({"name": "Premium Feature"});
         const amount = price * -1;
 
