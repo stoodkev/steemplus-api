@@ -140,7 +140,7 @@ exports.debitPremium = async function() {
             // request is a subscription
 
             // Test if user has enought SPP
-            if(feature.price > user.nbPoints){
+            if(user && feature.price > user.nbPoints){
               // If not send memo to inform him
               console.log(`create ackNotEnough => Premium Feature : Unsufficient number of SPP to use [${res[1]}]. Please get more SPP and try again. id:${res[2]}`);
               const memo = memoACKNotEnoughtTemplate(res[1], res[2]);
