@@ -155,7 +155,7 @@ exports.debitPremium = async function() {
             // request is a subscription
 
             // Test if user has enought SPP
-            if(user && feature.price > user.nbPoints){
+            if(!user || feature.price > user.nbPoints){
               // If not send memo to inform him
               const memo = memoACKNotEnoughtTemplate(res[1], res[2]);
               console.log(memo);
