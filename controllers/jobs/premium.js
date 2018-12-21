@@ -21,7 +21,7 @@ exports.debitPremium = async function() {
   const regexACKValid = /Premium Feature : ([0-9]*) SPP redeemed for \[([a-zA-Z0-9\s]*)\]/;
   const regexACKRenew = /Premium Feature : ([0-9]*) SPP redeemed for renewing \[([a-zA-Z0-9\s]*)\]/;
   const regexACKCancel = /Premium Feature : Subscription for \[([a-zA-Z0-9\s]*)\] has been canceled. id:([0-9]*)/;
-  const regexACKNotEnough = /Premium Feature : Unsufficient number of SPP to use \[([a-zA-Z0-9\s]*)\]. Please get more SPP and try again. id:([0-9]*)/;
+  const regexACKNotEnough = /Premium Feature : Unsufficient number of SPP to use \[([a-zA-Z0-9\s]*)\]. Please check "How to earn SPP?" on the SteemPlus Points section of your wallet. id:([0-9]*)/;
 
   const regexRequestID = /id:([0-9]*)/;
 
@@ -35,7 +35,7 @@ exports.debitPremium = async function() {
     return `Premium Feature : ${price} SPP redeemed for renewing [${featureName}] id:${requestID}`;
   }
   memoACKNotEnoughtTemplate = (featureName, requestID) => {
-    return `Premium Feature : Unsufficient number of SPP to use [${featureName}]. Please get more SPP and try again. id:${requestID}`;
+    return `Premium Feature : Unsufficient number of SPP to use [${featureName}]. Please check "How to earn SPP?" on the SteemPlus Points section of your wallet. id:${requestID}`;
   }
   memoACKCancelTemplate = (featureName, requestID) => {
     return `Premium Feature : Subscription for [${featureName}] has been canceled. id:${requestID}`;
