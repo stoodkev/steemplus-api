@@ -50,6 +50,12 @@ exports.addDays = function(date, days) {
   return result;
 }
 
+exports.addMonths = function(date, months) {
+  let result = new Date(date);
+  result.setMonth(result.getMonth() + months);
+  return result;
+}
+
 exports.addHours = function(date, hours) {
   let result = new Date(date);
   result.setHours(result.getHours() + hours);

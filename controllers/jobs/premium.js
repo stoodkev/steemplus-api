@@ -56,7 +56,22 @@ exports.debitPremium = async function() {
     lastEntryDate = lastEntry[0].timestampString;
   else lastEntryDate = "2018-12-05 12:05:42.000"; // This date is the steemplus point annoncement day + 7 days for rewards because rewards come after 7 days.
 
-  // Execute query on SteemSQL database
+  console.log(`
+        SELECT [to], [from], memo, timestamp
+        FROM TxTransfers
+        WHERE
+          timestamp > CONVERT(datetime, '${lastEntryDate}')
+        AND
+        (
+            ([to] = '${accountName}' AND memo LIKE '%Premium Feature%' )
+          OR
+            ([from] = '${accountName}' AND memo LIKE '%Premium Feature%' )
+        )
+        AND ([to] != [from])
+        ORDER BY timestamp;
+        `)
+
+   // Execute query on SteemSQL database
   return new sql.ConnectionPool(config.config_api)
     .connect()
     .then(pool => {
@@ -118,7 +133,7 @@ exports.debitPremium = async function() {
           if(regexCancelSubscription.test(request.memo)){
             // if type is cancelation send cancelation memo
             const memo = memoACKCancelTemplate(res[1], res[2]);
-
+            console.log(memo);
             steem.broadcast.transfer(config.sp_act,
               accountName,
               request.from,
@@ -142,9 +157,8 @@ exports.debitPremium = async function() {
             // Test if user has enought SPP
             if(user && feature.price > user.nbPoints){
               // If not send memo to inform him
-              console.log(`create ackNotEnough => Premium Feature : Unsufficient number of SPP to use [${res[1]}]. Please get more SPP and try again. id:${res[2]}`);
               const memo = memoACKNotEnoughtTemplate(res[1], res[2]);
-
+              console.log(memo);
               // To test use lecaillon here
               steem.broadcast.transfer(config.sp_act,
                 accountName,
@@ -167,9 +181,8 @@ exports.debitPremium = async function() {
             else
             {
               // If user has enough SPP then send valid ACK
-              console.log(`send ackValid to ${request.from} => Premium Feature : ${feature.price} SPP redeemed for [${feature.name}] id:${res[2]}`)
               const memo = memoACKValidTemplate(feature.price, feature.name, res[2]);
-
+              console.log(memo);
               steem.broadcast.transfer(config.sp_act,
                 accountName,
                 request.from,
@@ -309,7 +322,7 @@ exports.debitPremium = async function() {
       let subList = await SubscriptionPremium.find({});
       const dateNow = new Date();
       for(subscription of subList){
-        const renewDate = utils.addDays(new Date(subscription.lastPayment), 1);
+        const renewDate = utils.addMonths(new Date(subscription.lastPayment), 1);
         if(dateNow > renewDate){
           // Auto Renew
           let user = await User.findOne({"_id": subscription.user});
@@ -322,7 +335,7 @@ exports.debitPremium = async function() {
           else if(feature.price > user.nbPoints){
             // No enought money
             console.log("Not enought points to renew")
-            await steem.broadcast.transfer(config.wif_test,
+            await steem.broadcast.transfer(config.sp_act,
               accountName,
               user.accountName,
               "0.001 SBD",
@@ -336,7 +349,7 @@ exports.debitPremium = async function() {
           else {
             // if enought points and not canceled then auto renew
             console.log("Renew");
-            steem.broadcast.transfer(config.wif_test,
+            steem.broadcast.transfer(config.sp_act,
               accountName,
               user.accountName,
               "0.001 SBD",
