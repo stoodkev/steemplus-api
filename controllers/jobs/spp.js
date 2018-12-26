@@ -442,6 +442,10 @@ async function updateSteemplusPointsComments(comments) {
       type = await TypeTransaction.findOne({
         name: "Utopian.io"
       });
+    else if (comment.beneficiaries.includes("steemhunt"))
+      type = await TypeTransaction.findOne({
+        name: "Steemhunt"
+      });
     else {
       let benefs = JSON.parse(comment.beneficiaries);
       if (benefs.length > 1)
@@ -534,7 +538,18 @@ async function updateSteemplusPointsTransfers(transfers) {
 
       // Get type
       let type = null;
-      if (transfer.to === "minnowbooster") {
+      if (transfer.memo.match(/type:([a-zA-Z]*)[\s]*username:([a-zA-Z0-9\.-]*)[\s]*amount:([0-9]*\.*[0-9]*)[\s]*amountUnit:([a-zA-Z]*)/i) !== null)
+      {
+        let res = transfer.memo.match(/type:([a-zA-Z]*)[\s]*username:([a-zA-Z0-9\.-]*)[\s]*amount:([0-9]*\.*[0-9]*)[\s]*amountUnit:([a-zA-Z]*)/i);
+        type = await TypeTransaction.findOne({
+          name: res[1]
+        });
+        accountName = res[2];
+        amount = res[3];
+        amountSymbol = res[4];
+        requestType = 1;
+      }
+      else if (transfer.to === "minnowbooster") {
         if (transfer.memo.toLowerCase().replace("steemplus") === "") {
           continue;
         }
@@ -918,6 +933,12 @@ exports.updateSteemplusPoints = async function() {
           timestamp > CONVERT(datetime, '${lastEntryDate}')
           AND
           [to] = 'steem-plus' AND memo LIKE 'Project=Fundition-6om5dpvkb%'
+        )
+        OR 
+        (
+          timestamp > CONVERT(datetime, '${lastEntryDate}')
+          AND
+          [to] = 'steem-plus' AND [from] = 'steem-plus' AND memo LIKE '%type%'
         );
       `);
       })
