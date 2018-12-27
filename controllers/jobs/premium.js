@@ -21,7 +21,7 @@ exports.debitPremium = async function() {
   const regexACKValid = /Premium Feature : ([0-9]*) SPP redeemed for \[([a-zA-Z0-9\s]*)\]/;
   const regexACKRenew = /Premium Feature : ([0-9]*) SPP redeemed for renewing \[([a-zA-Z0-9\s]*)\]/;
   const regexACKCancel = /Premium Feature : Subscription for \[([a-zA-Z0-9\s]*)\] has been canceled. id:([0-9]*)/;
-  const regexACKNotEnough = /Premium Feature : Unsufficient number of SPP to use \[([a-zA-Z0-9\s]*)\]. Please check "How to earn SPP?" on the SteemPlus Points section of your wallet. id:([0-9]*)/;
+  const regexACKNotEnough = /Premium Feature : Unsufficient number of SPP to use \[([a-zA-Z0-9\s]*)\]. Please check "How to earn SPP\?" on the SteemPlus Points section of your wallet. id:([0-9]*)/;
 
   const regexRequestID = /id:([0-9]*)/;
 
@@ -103,13 +103,14 @@ exports.debitPremium = async function() {
 
       // For each request
       for(request of requests) {
-
+        console.log(request);
         // Get the id of the request
         let id = request.memo.match(regexRequestID)[1];
         // Try to find the matching ack
         let ack = acks.find(function(element) {
           return element.memo.match(regexRequestID)[1] === id;
         });
+        console.log(ack);
 
         let price, featureName, feature, user, res;
 
@@ -209,7 +210,7 @@ exports.debitPremium = async function() {
         if (regexACKValid.test(ack.memo))
         {
           // If ack okay, try to find subscription
-
+          console.log('ici');
           let sub = await SubscriptionPremium.findOne({"user": user, "premiumFeature": feature});
           if(sub === null || sub === undefined){
             // If subscription not in database, create it
@@ -243,6 +244,10 @@ exports.debitPremium = async function() {
         {
           // Case Not enough
           console.log('ACK Not enough');
+          continue;
+        }
+        else {
+          console.log('memo not matching anything');
           continue;
         }
 
