@@ -103,15 +103,12 @@ exports.debitPremium = async function() {
 
       // For each request
       for(request of requests) {
-        console.log(request);
         // Get the id of the request
         let id = request.memo.match(regexRequestID)[1];
         // Try to find the matching ack
         let ack = acks.find(function(element) {
           return element.memo.match(regexRequestID)[1] === id;
         });
-        console.log(ack);
-
         let price, featureName, feature, user, res;
 
         if(regexSubscribe.test(request.memo)){
@@ -127,6 +124,12 @@ exports.debitPremium = async function() {
         user = await User.findOne({"accountName": request.from});
         feature = await PremiumFeature.findOne({"name": res[1]});
 
+        let sub = await SubscriptionPremium.findOne({"user": user, "premiumFeature": feature});
+        if(sub !== null && sub !== undefined) {
+          // Don't send a memo
+          continue;
+        }
+        
         // If ack is undefined or null it means Steemplus hasn't reply yet
         if(ack === undefined || ack === null){
           // SteemPlus hasn't answered yet
@@ -154,7 +157,7 @@ exports.debitPremium = async function() {
           }
           else {
             // request is a subscription
-
+            
             // Test if user has enought SPP
             if(!user || feature.price > user.nbPoints){
               // If not send memo to inform him
@@ -210,7 +213,6 @@ exports.debitPremium = async function() {
         if (regexACKValid.test(ack.memo))
         {
           // If ack okay, try to find subscription
-          console.log('ici');
           let sub = await SubscriptionPremium.findOne({"user": user, "premiumFeature": feature});
           if(sub === null || sub === undefined){
             // If subscription not in database, create it

@@ -535,6 +535,8 @@ async function updateSteemplusPointsTransfers(transfers) {
       let amount = transfer.amount * 0.01; //Steemplus take 1% of the transaction
 
       let requestType = null;
+      let amountSymbol = null;
+      let isManual = false;
 
       // Get type
       let type = null;
@@ -548,6 +550,7 @@ async function updateSteemplusPointsTransfers(transfers) {
         amount = res[3];
         amountSymbol = res[4];
         requestType = 1;
+        isManual = true;
       }
       else if (transfer.to === "minnowbooster") {
         if (transfer.memo.toLowerCase().replace("steemplus") === "") {
@@ -706,15 +709,27 @@ async function updateSteemplusPointsTransfers(transfers) {
       ).price;
       // We decided that 1SPP == 0.01 SBD
       let nbPoints = 0;
-      if (transfer.amount_symbol === "SBD") nbPoints = amount * 100;
-      else if (transfer.amount_symbol === "STEEM") {
-        nbPoints = amount * ratioSBDSteem * 100;
+      if(isManual){
+        if (amountSymbol === "SBD") nbPoints = amount * 100;
+        else if (amountSymbol === "STEEM") {
+          nbPoints = amount * ratioSBDSteem * 100;
+        }
+        else if(amountSymbol === "SPP") nbPoints = amount;
       }
+      else {
+        if (transfer.amount_symbol === "SBD") nbPoints = amount * 100;
+        else if (transfer.amount_symbol === "STEEM") {
+          nbPoints = amount * ratioSBDSteem * 100;
+        }
+        else if(amountSymbol === "SPP") nbPoints = amount;
+      }
+      
+
       // Create new PointsDetail entry
       let pointsDetail = new PointsDetail({
         nbPoints: nbPoints,
         amount: amount,
-        amountSymbol: transfer.amount_symbol,
+        amountSymbol: amountSymbol || transfer.amount_symbol,
         permlink: permlink,
         user: user._id,
         typeTransaction: type._id,
