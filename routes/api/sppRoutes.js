@@ -9,6 +9,11 @@ const sppRouter = function(app) {
     res.status(200).send(await spp.getSPP(req.params.username));
   });
 
+  app.get("/spp/light/:username", async function(req, res) {
+    const result = await spp.getSPP(req.params.username)[0];
+    res.status(200).send(await spp.getSPPLight(req.params.username));
+  });
+
   app.get("/premium-feature-list", async function(req, res) {
 	res.status(200).send(await premium.getFeatureList());
   });

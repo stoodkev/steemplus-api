@@ -9,3 +9,9 @@ exports.getSPP = async function(username) {
     })
     .exec();
 };
+
+exports.getSPPLight = async function(username) {
+	return await User.findOne({ accountName: username}, {'accountName':1, 'nbPoints':1, '_id':0}, function (err, docs) {
+		return docs;
+	});
+}

@@ -56,21 +56,6 @@ exports.debitPremium = async function() {
     lastEntryDate = lastEntry[0].timestampString;
   else lastEntryDate = "2018-12-05 12:05:42.000"; // This date is the steemplus point annoncement day + 7 days for rewards because rewards come after 7 days.
 
-  console.log(`
-        SELECT [to], [from], memo, timestamp
-        FROM TxTransfers
-        WHERE
-          timestamp > CONVERT(datetime, '${lastEntryDate}')
-        AND
-        (
-            ([to] = '${accountName}' AND memo LIKE '%Premium Feature%' )
-          OR
-            ([from] = '${accountName}' AND memo LIKE '%Premium Feature%' )
-        )
-        AND ([to] != [from])
-        ORDER BY timestamp;
-        `)
-
    // Execute query on SteemSQL database
   return new sql.ConnectionPool(config.config_api)
     .connect()
