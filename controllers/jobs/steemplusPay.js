@@ -34,23 +34,23 @@ exports.grow = async function() {
         " STEEM" !=
       "0.000 STEEM"
     ) {
-      await steem.broadcast.transferToVestingAsync(
-        config.payActKey,
-        "steemplus-pay",
-        "steemplus-pay",
-        (
-          parseFloat(steemPlusPay[0].reward_steem_balance.split(" ")[0]) +
-          parseFloat(steemPlusPay[0].balance.split(" ")[0])
-        ).toFixed(3) + " STEEM"
-      );
-      console.log(
-        "Powered up " +
-          (
-            parseFloat(steemPlusPay[0].reward_steem_balance.split(" ")[0]) +
-            parseFloat(steemPlusPay[0].balance.split(" ")[0])
-          ).toFixed(3) +
-          " STEEM"
-      );
+      // await steem.broadcast.transferToVestingAsync(
+      //   config.payActKey,
+      //   "steemplus-pay",
+      //   "steemplus-pay",
+      //   (
+      //     parseFloat(steemPlusPay[0].reward_steem_balance.split(" ")[0]) +
+      //     parseFloat(steemPlusPay[0].balance.split(" ")[0])
+      //   ).toFixed(3) + " STEEM"
+      // );
+      // console.log(
+      //   "Powered up " +
+      //     (
+      //       parseFloat(steemPlusPay[0].reward_steem_balance.split(" ")[0]) +
+      //       parseFloat(steemPlusPay[0].balance.split(" ")[0])
+      //     ).toFixed(3) +
+      //     " STEEM"
+      // );
     } else console.log("Nothing to Power Up!");
     steemPlusPay = await steem.api.getAccountsAsync(["steemplus-pay"]);
     let priceSBDUSB = await utils.getSBDPriceUSD();
