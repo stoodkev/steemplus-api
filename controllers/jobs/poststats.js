@@ -92,7 +92,7 @@ exports.getPostStats = async function () {
   return(title+body);
 };
 
-// get daily users on Chrome Store
+// get daily users on Chrome and Firefox Stores
 function getDailyUsers(){
   const chromeExtensionWebstoreURL = 'https://chrome.google.com/webstore/detail/steemplus/mjbkjgcplmaneajhcbegoffkedeankaj?hl=en';
   const firefoxExtensionWebstoreURL= 'https://addons.mozilla.org/en-US/firefox/addon/steem-plus/?src=search';
@@ -100,8 +100,9 @@ function getDailyUsers(){
     getJSON('http://www.whateverorigin.org/get?url=' + encodeURIComponent(chromeExtensionWebstoreURL),function(e,response){
       const users=response.contents.match(/<Attribute name=\"user_count\">([\d]*?)<\/Attribute>/)[1];
       getJSON('http://www.whateverorigin.org/get?url=' + encodeURIComponent(firefoxExtensionWebstoreURL),function(e,firefox){
-        const users_firefox=firefox.contents.match(/<dd class=\"MetadataCard-content\">([/\d]*?)<\/dd>/)[1];
-        console.log(users);
+        let users_firefox=firefox.contents.match(/<dd class=\"MetadataCard-content\">([/\d]*?)<\/dd>/);
+        if(users_firefox==undefined) users_firefox=0;
+        else users_firefox=users_firefox[1];
         console.log({chrome:users,firefox:users_firefox,total:parseInt(users)+parseInt(users_firefox)});
         fulfill({chrome:users,firefox:users_firefox,total:parseInt(users)+parseInt(users_firefox)});
       });
