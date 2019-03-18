@@ -4,11 +4,12 @@ const vote = require("../../controllers/jobs/vote.js");
 const poststats = require("../../controllers/jobs/poststats.js");
 const premium = require("../../controllers/jobs/premium.js");
 const steemplusPay = require("../../controllers/jobs/steemplusPay.js");
+const ads = require("../../controllers/jobs/ads.js");
 const utils = require("../../utils.js");
 const steem = require("steem");
 
 const VOTING_ACCOUNT = "steem-plus";
-
+const ADS_FEE=25;
 let payDelegationsStarted = false;
 let growStarted = false;
 let updateSteemplusPointsStarted = false;
@@ -16,6 +17,7 @@ let botVoteStarted = false;
 let weeklyRewardsStarted = false;
 let postStatsStarted = false;
 let debitPremiumStarted = false;
+let newAdsStarted = false;
 
 const jobRoutes = function(app) {
   // Method used to give user rewards depending on delegations
@@ -102,7 +104,7 @@ const jobRoutes = function(app) {
       if (err) {
         console.log(err);
         botVoteStarted = false;
-      } 
+      }
       else {
         let spAccount = result[0];
         // Only start voting if the voting power is full
@@ -167,6 +169,21 @@ const jobRoutes = function(app) {
     res.status(200).send("OK");
     await premium.debitPremium();
     debitPremiumStarted = false;
+  });
+
+  app.get("/job/newAds/:key", async function(req, res) {
+    if (req.params.key !== config.key) {
+      res.status(403).send("Permission denied");
+      return;
+    }
+    if(newAdsStarted) {
+      res.status(403).send("New Ads Job already started");
+      return;
+    }
+    newAdsStarted = true;
+    res.status(200).send("OK");
+    await ads.addNewAds();
+    newAdsStarted = false;
   });
 };
 
