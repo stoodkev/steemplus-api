@@ -37,7 +37,7 @@ exports.weeklyRewards = async function(startWeek, endWeek) {
   const weeklyRewardType = await TypeTransaction.findOne({"name": "Weekly Reward"});
 
   // Rewards for top 10
-  // Ex : 
+  // Ex :
   // 1st place 50% of the pool
   // 2nd place 25% of the pool
   // 3rd place 12.5% of the pool
@@ -47,8 +47,8 @@ exports.weeklyRewards = async function(startWeek, endWeek) {
   // MongoDB query creation for ranking
   const weeklyQuery = [
     { "$match": { "typeTransaction": { $nin: [delegationType._id, reblogType._id, weeklyRewardType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
-    { "$group": 
-      { 
+    { "$group":
+      {
         "_id": "$user",
         points: {
           $sum: "$nbPoints"
@@ -68,8 +68,8 @@ exports.weeklyRewards = async function(startWeek, endWeek) {
   // MongoDB query creation for total points
   const totalPointQuery = [
     { "$match": { "typeTransaction": { $nin: [delegationType._id, reblogType._id, weeklyRewardType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
-    { "$group": 
-      { 
+    { "$group":
+      {
         "_id": null,
         points: {
           $sum: "$nbPoints"
@@ -723,7 +723,7 @@ async function updateSteemplusPointsTransfers(transfers) {
         }
         else if(amountSymbol === "SPP") nbPoints = amount;
       }
-      
+
 
       // Create new PointsDetail entry
       let pointsDetail = new PointsDetail({
@@ -943,13 +943,13 @@ exports.updateSteemplusPoints = async function() {
               10 * 60}, GETUTCDATE()))
           )
         )
-        OR 
+        OR
         (
           timestamp > CONVERT(datetime, '${lastEntryDate}')
           AND
           [to] = 'steem-plus' AND memo LIKE 'Project=Fundition-6om5dpvkb%'
         )
-        OR 
+        OR
         (
           timestamp > CONVERT(datetime, '${lastEntryDate}')
           AND
@@ -991,7 +991,7 @@ exports.updateSteemplusPoints = async function() {
         INNER JOIN Comments
         ON Comments.author = Reblogs.author
         AND Comments.permlink = Reblogs.permlink
-        WHERE Comments.author = 'steem-plus' 
+        WHERE Comments.author = 'steem-plus'
         AND timestamp > CONVERT(datetime, '${lastEntryDate}')
         AND depth = 0
         AND Comments.created > DATEADD(day, -7, timestamp);
