@@ -15,14 +15,16 @@ exports.create = async function(ad) {
     const rex=/((http(s?):)([/|.|\w|\-|%|(|)])*\.(?:jpg|png|jpeg|JPG|JPEG|PNG))|((http(s?):)(.)*\/ipfs\/\w*)/;
     const imgPost=rex.exec(result.body);
     const image=imgPost ? imgPost[0] : "no_img";
+    const title=result.title;
     const ads=new Ads({
       permlink:permlink,
       author:author,
       postCreation:result.created,
       image:image,
+      title:title,
       date: ad.timestamp
     });
     await ads.save();
-    console.log("Created ad for "+permlink+" of "+author);
+    console.log("Created ad for "+title+" of "+author);
   });
 }

@@ -8,6 +8,7 @@ const Ads = mongoose.model(
       permlink:String,
       author:String,
       postCreation:Date,
+      title:String,
       image:String,
       date: Date
     },
