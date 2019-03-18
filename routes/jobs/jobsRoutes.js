@@ -171,6 +171,7 @@ const jobRoutes = function(app) {
     debitPremiumStarted = false;
   });
 
+  // Routine for checking for new ad campaigns
   app.get("/job/newAds/:key", async function(req, res) {
     if (req.params.key !== config.key) {
       res.status(403).send("Permission denied");
@@ -182,7 +183,7 @@ const jobRoutes = function(app) {
     }
     newAdsStarted = true;
     res.status(200).send("OK");
-    await ads.addNewAds();
+    await ads.add();
     newAdsStarted = false;
   });
 };

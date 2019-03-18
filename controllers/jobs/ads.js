@@ -6,7 +6,8 @@ const Ads = require("../../models/ads.js");
 const ads = require("../api/ads.js");
 const PRICE_AD=25;
 
-exports.addNewAds = async function() {
+//Search for transactions paying for new advertisment campaigns
+exports.add = async function() {
   // Get the last entry for ads
   let lastEntry = await Ads.find({})
     .sort({
@@ -39,6 +40,7 @@ exports.addNewAds = async function() {
       console.log(result);
       const newAds=result.recordsets[0];
       for (ad of newAds){
+        // if ad fits the criteria, create a new campaign
         if(isAcceptable(ad)){
           ads.create(ad);
         }

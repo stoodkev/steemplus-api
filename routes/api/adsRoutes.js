@@ -7,6 +7,7 @@ const apiRouter = function(app) {
     res.status(200).send(await ads.getAds());
   });
 
+  // Creating an ad campaign via a POST method
   app.post("/ads", async function(req, res) {
     if (req.body.key !== config.key) {
       res.status(403).send("Permission denied");
