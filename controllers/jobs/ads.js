@@ -4,7 +4,7 @@ const config = require("../../config.js");
 const utils = require("../../utils.js");
 const Ads = require("../../models/ads.js");
 const ads = require("../api/ads.js");
-const PRICE_AD=25;
+const PRICE_AD=0.001;
 
 //Search for transactions paying for new advertisment campaigns
 exports.add = async function() {
