@@ -65,7 +65,6 @@ exports.weeklyRewards = async function(startWeek, endWeek) {
   ]
 
   const tmpUsers = await User.populate(await PointsDetail.aggregate(weeklyQuery).exec(), {path: "_id", select: 'accountName'});
-
   // MongoDB query creation for total points
   const totalPointQuery = [
     { "$match": { "typeTransaction": { $nin: [delegationType._id, reblogType._id, weeklyRewardType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
@@ -91,7 +90,8 @@ exports.weeklyRewards = async function(startWeek, endWeek) {
     rankingRes.push({
       rank: index + 1,
       accountName: user._id.accountName,
-      nbPoints: nbPointsUser.toFixed(2)
+      nbPoints: nbPointsUser.toFixed(2),
+      points:user.points
     });
   });
   // return result
@@ -99,7 +99,7 @@ exports.weeklyRewards = async function(startWeek, endWeek) {
     ranking: rankingRes,
     totalPointsWeek: totalPointsWeek,
     totalPointsRewards: totalPointsRewards,
-    endWeek: endWeek
+    endWeek: endWeek,
   }
 };
 
@@ -154,11 +154,12 @@ exports.payWeeklyRewards = async function() {
       pointsDetail = await pointsDetail.save();
 
       // Update user account
-      console.log(user.accountName, 'old Points ', user.nbPoints);
+      //console.log(user.accountName, 'old Points ', user.nbPoints);
+      console.log(user.accountName,'weekly points',reward.points ,'Weekly points bonus', reward.nbPoints);
       user.pointsDetails.push(pointsDetail);
       user.nbPoints += parseFloat(reward.nbPoints);
       await user.save();
-      console.log(user.accountName, 'new Points ', user.nbPoints);
+      //console.log(user.accountName, 'new Points ', user.nbPoints);
     }
     startWeek = addDays(startWeek, 7);
     endWeek = addDays(endWeek, 7);
@@ -307,7 +308,6 @@ exports.payDelegations = async function() {
       // User can get a reward if he delegated for 7 days in a row.
       for (i; i < 7; i++) {
         // Look for minimum delegation of the last 24 hours not last one
-        console.log(i);
         previousDelegation = currentDelegation;
         currentDelegation = delegations[delegator]
           .filter(

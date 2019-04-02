@@ -28,6 +28,7 @@ const replay = function(app) {
     console.log("Clearing database ...");
 
     // Clear database and populate types
+    //await PointsDetail.deleteMany({typeTransaction:await TypeTransaction.findOne({"_id":"5ca3627b9c2b125e64a40af4"})});
     await User.deleteMany({});
     await PointsDetail.deleteMany({});
     await Ads.deleteMany({});
@@ -53,7 +54,7 @@ const replay = function(app) {
     console.log("Done rewarding delegations");
     console.log("Debiting premium subscriptions");
     await premium.debitPremium();
-    console.log("Done deibiting");
+    console.log("Done debiting");
     console.log("Start paying weekly rewards");
     await spp.payWeeklyRewards();
     console.log("Done paying daily rewards");
@@ -62,6 +63,7 @@ const replay = function(app) {
     console.log("Done loading ads");
     console.log("Done replaying");
     replayStarted = false;
+    //TODO: Stop other jobs during replay
   });
 }
 
