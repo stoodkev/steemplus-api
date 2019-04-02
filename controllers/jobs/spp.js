@@ -498,6 +498,7 @@ async function updateSteemplusPointsComments(comments) {
 // Function used to process the data from SteemSQL for requestType == 1
 // @parameter transfers : transfers data received from SteemSQL
 async function updateSteemplusPointsTransfers(transfers) {
+  console.log("Looking for transfers");
   // Number of new entry in the DB
   let nbPointDetailsAdded = 0;
   let reimbursementList = transfers.filter(
@@ -752,6 +753,7 @@ async function updateSteemplusPointsTransfers(transfers) {
 // Function used to process the data from SteemSQL for requestType == 4
 // @parameter transfers : transfers data received from SteemSQL
 async function updateSteemplusPointsReblogs(reblogs) {
+  console.log("Looking for reblogs");
   // Number of new entry in the DB
   let nbPointDetailsAdded = 0;
   console.log(`Adding ${reblogs.length} new reblog(s) to DB`);
@@ -879,16 +881,15 @@ exports.updateSteemplusPoints = async function() {
         ORDER BY created ASC;
         `);
       })
-      .then(result => {
+      .then(async function(result){
         // Start data processing
-        updateSteemplusPointsComments(result.recordsets[0]);
+        await updateSteemplusPointsComments(result.recordsets[0]);
         sql.close();
       })
       .catch(error => {
         console.log(error);
         sql.close();
       });
-
     // Get the last entry for the second request type (Transfers : Postpromoter)
     lastEntry = await PointsDetail.find({
         requestType: 1
@@ -915,6 +916,7 @@ exports.updateSteemplusPoints = async function() {
       lastEntryDateMB = lastEntryMB[0].timestampString;
     else lastEntryDateMB = "2018-08-03 12:05:42.000"; // This date is the steemplus point annoncement day
     // Execute SteemSQL query
+
     await new sql.ConnectionPool(config.config_api)
       .connect()
       .then(pool => {
@@ -958,8 +960,10 @@ exports.updateSteemplusPoints = async function() {
         );
       `);
       })
-      .then(result => {
-        updateSteemplusPointsTransfers(result.recordsets[0]);
+      .then(async function(result){
+        console.log("fetching transfers3");
+
+        await updateSteemplusPointsTransfers(result.recordsets[0]);
         sql.close();
       })
       .catch(error => {
@@ -998,9 +1002,9 @@ exports.updateSteemplusPoints = async function() {
         AND Comments.created > DATEADD(day, -7, timestamp);
       `);
       })
-      .then(result => {
+      .then(async function(result){
         // Start data processing
-        updateSteemplusPointsReblogs(result.recordsets[0]);
+        await updateSteemplusPointsReblogs(result.recordsets[0]);
         sql.close();
       })
       .catch(error => {

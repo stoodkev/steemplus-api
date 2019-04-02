@@ -32,9 +32,9 @@ exports.weekNumber = function(dt) {
   tdt.setDate(tdt.getUTCDate() - dayn + 3);
   let firstThursday = tdt.valueOf();
   tdt.getUTCMonth(0, 1);
-  if (tdt.getUTCDay() !== 4) 
+  if (tdt.getUTCDay() !== 4)
     tdt.getUTCMonth(0, 1 + ((4 - tdt.getUTCDay()) + 7) % 7);
-  return 1 + Math.ceil((firstThursday - tdt) / 604800000); 
+  return 1 + Math.ceil((firstThursday - tdt) / 604800000);
 };
 
 exports.getLastWeekday = function ( date , weekday ) { // 0 = sunday, 1 = monday, ... , 6 = saturday
@@ -276,30 +276,33 @@ exports.storeSteemPriceInBlockchain = function(
   totalSteem,
   totalVests
 ) {
-  getJSON(
-    "https://bittrex.com/api/v1.1/public/getticker?market=BTC-SBD",
-    function(err, response) {
-      const accountName = "steemplus-bot";
-      const json = JSON.stringify({
-        priceHistory: {
-          priceSteem: priceSteem,
-          priceSBD: priceSBD,
-          priceBTC: response.result["Bid"],
-          totalSteem: totalSteem,
-          totalVests: totalVests
-        }
-      });
+  return new Promise(function(fulfill,reject){
+    getJSON(
+      "https://bittrex.com/api/v1.1/public/getticker?market=BTC-SBD",
+      function(err, response) {
+        const accountName = "steemplus-bot";
+        const json = JSON.stringify({
+          priceHistory: {
+            priceSteem: priceSteem,
+            priceSBD: priceSBD,
+            priceBTC: response.result["Bid"],
+            totalSteem: totalSteem,
+            totalVests: totalVests
+          }
+        });
 
-      steem.broadcast.transfer(
-        config.wif_bot || process.env.WIF_TEST_2,
-        accountName,
-        accountName,
-        "0.001 SBD",
-        json,
-        function(err, result) {
-          console.log(err, result);
-        }
-      );
-    }
-  );
+        steem.broadcast.transfer(
+          config.wif_bot || process.env.WIF_TEST_2,
+          accountName,
+          accountName,
+          "0.001 SBD",
+          json,
+          function(err, result) {
+            console.log(err, result);
+            fulfill();
+          }
+        );
+      }
+    );
+  });
 };
