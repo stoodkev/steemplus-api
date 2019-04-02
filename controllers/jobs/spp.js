@@ -168,7 +168,7 @@ exports.payWeeklyRewards = async function() {
 
 // Function used to credit account for delegations
 exports.payDelegations = async function() {
-  console.log('start paying delegation');
+  console.log('Start paying delegation');
   let historyDelegations = null;
   let priceHistory = null;
 
@@ -240,7 +240,6 @@ exports.payDelegations = async function() {
 
   let dateStartSPP = new Date("2017-08-03 12:05:42.000");
   let dateNow = new Date();
-
   // For each delegator
   for (delegator of delegators) {
     let startDate = null;
@@ -278,6 +277,7 @@ exports.payDelegations = async function() {
       .sort(function(a, b) {
         return b.timestamp - a.timestamp;
       })[0].vesting_shares;
+    console.log(previousDelegation);
     // Look for minimum delegation of the last 24 hours not last one
     currentDelegation = delegations[delegator]
       .filter(
@@ -297,7 +297,6 @@ exports.payDelegations = async function() {
         });
       if (tmp !== currentDelegation) currentDelegation = tmp[0].vesting_shares;
     } else currentDelegation = currentDelegation.vesting_shares;
-
     // This loop will check everyday until 'today'
     while (date < dateNow) {
       let weekly = 0;
@@ -308,6 +307,7 @@ exports.payDelegations = async function() {
       // User can get a reward if he delegated for 7 days in a row.
       for (i; i < 7; i++) {
         // Look for minimum delegation of the last 24 hours not last one
+        console.log(i);
         previousDelegation = currentDelegation;
         currentDelegation = delegations[delegator]
           .filter(
@@ -318,7 +318,6 @@ exports.payDelegations = async function() {
           .sort(function(a, b) {
             return a.vesting_shares - b.vesting_shares;
           })[0];
-
         // Same behavior as during the init part
         if (currentDelegation === undefined) {
           currentDelegation = previousDelegation;
@@ -335,6 +334,7 @@ exports.payDelegations = async function() {
         if (currentDelegation === 0 || currentDelegation === undefined) {
           hasCanceledDelegation = true;
           currentDelegation = 0;
+          previousDate = subDays(date, 1);
           break;
         }
 
@@ -393,13 +393,12 @@ exports.payDelegations = async function() {
           requestType: 3
         });
         pointsDetail = await pointsDetail.save();
-
+        console.log("saved");
         // Update user account
         user.pointsDetails.push(pointsDetail);
         user.nbPoints = user.nbPoints + nbPoints;
         await user.save();
       } else {
-        console.log("No delegation for this day");
         date = addDays(date, 1);
       }
     }
