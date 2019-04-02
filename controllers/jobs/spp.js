@@ -1,4 +1,5 @@
 const config = require("../../config.js");
+require("dotenv").config();
 const sql = require("mssql");
 const steem = require("steem");
 const spp = require("./spp");
@@ -812,12 +813,13 @@ exports.updateSteemplusPoints = async function() {
 
     // Calculate ration SBD/Steem
     currentRatioSBDSteem = values[2] / values[1];
-    utils.storeSteemPriceInBlockchain(
-      values[2],
-      values[1],
-      currentTotalSteem,
-      currentTotalVests
-    );
+    if(!process.env.DEV)
+      utils.storeSteemPriceInBlockchain(
+        values[2],
+        values[1],
+        currentTotalSteem,
+        currentTotalVests
+      );
 
     //get price history
     await new sql.ConnectionPool(config.config_api)
