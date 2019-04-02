@@ -29,14 +29,14 @@ exports.getSppStats = async function() {
 
   let ppu = await User.aggregate(points_per_user).exec();
   //console.log(ppu);
-  ppu = ppu.map(function(doc) {
+  ppu = ppu.map(function(doc,index) {
     doc.name = doc._id;
     doc._id = doc.origId;
     doc.points = doc.points.toFixed(3);
+    doc.rank=index;
     delete doc._id;
     return doc;
   });
-  result.points_per_user = ppu;
 
   const points_per_user_day = [
     {
@@ -56,17 +56,17 @@ exports.getSppStats = async function() {
   ];
 
   let ppu_day = await PointsDetail.aggregate(points_per_user_day).exec();
-  ppu_day = ppu_day.map(async function(doc) {
+  ppu_day = ppu_day.map(async function(doc,index) {
     let a = await User.findById(doc._id).exec();
     doc.name = a.accountName;
     doc._id = doc.origId;
     doc.points = doc.points.toFixed(3);
+    doc.rank=index;
     delete doc._id;
     return doc;
   });
 
   ppu_day = await Promise.all(ppu_day);
-  result.points_per_user_day = ppu_day;
 
   const points_per_transaction = [
     {
@@ -90,7 +90,6 @@ exports.getSppStats = async function() {
     return doc;
   });
   ppt = await Promise.all(ppt);
-  result.points_per_transaction = ppt;
   const total = ppt
     .reduce(function(a, b) {
       return a + parseFloat(b.points);
@@ -122,7 +121,6 @@ exports.getSppStats = async function() {
     return doc;
   });
   ppt_day = await Promise.all(ppt_day);
-  result.points_per_transaction_day = ppt_day;
   const total_day_exclusive = ppt_day
     .reduce(function(a, b) {
       return (b.type == "Delegation"||b.type=="Reblog"||b.type=="Weekly Reward" )? a : a + parseFloat(b.points);
@@ -138,7 +136,10 @@ exports.getSppStats = async function() {
   result.total_points_day_exclusive = total_day_exclusive;
   result.total_points = total;
   result.spp_holders = ppu.length;
-  //console.log(result);
+  result.points_per_transaction_day = ppt_day;
+  result.points_per_transaction = ppt;
+  result.points_per_user = ppu;
+  result.points_per_user_day = ppu_day;
   return result;
 };
 
@@ -154,8 +155,8 @@ exports.getRankings = async function() {
   // Get rewards of all time per user excluding delegations.
   const foreverQuery = [
     { "$match": { "user": { $nin: userNotIncluded.map(u => u._id)} } },
-    { "$group": 
-      { 
+    { "$group":
+      {
         "_id": "$user",
         points: {
           $sum: "$nbPoints"
@@ -177,8 +178,8 @@ exports.getRankings = async function() {
   // Get only current month spp per user excluding delegations
   const monthlyQuery = [
     { "$match": { timestamp: { '$gte' : new Date(`${dateNow.getUTCFullYear()}-${dateNow.getUTCMonth() + 1}-01T00:00:00.000Z`) }, "user": { $nin: userNotIncluded.map(u => u._id)} } },
-    { "$group": 
-      { 
+    { "$group":
+      {
         "_id": "$user",
         points: {
           $sum: "$nbPoints"
@@ -203,11 +204,11 @@ exports.getRankings = async function() {
   // Get only current week spp per user excluding delegations
   const endWeek = new Date(Date.UTC(nextSunday.getUTCFullYear(), nextSunday.getUTCMonth(), nextSunday.getUTCDate(), 23, 59, 59, 999));
   const startWeek = new Date(Date.UTC(previousMonday.getUTCFullYear(), previousMonday.getUTCMonth(), previousMonday.getUTCDate(), 0, 0, 0, 0));
- 
+
   const weeklyQuery = [
     { "$match": { "typeTransaction": { $nin: [delegationType._id, reblogType._id, weeklyRewardType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
-    { "$group": 
-      { 
+    { "$group":
+      {
         "_id": "$user",
         points: {
           $sum: "$nbPoints"
@@ -222,8 +223,8 @@ exports.getRankings = async function() {
 
   const totalWeekPointsQuery = [
     { "$match": { "typeTransaction": { $nin: [delegationType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
-    { "$group": 
-      { 
+    { "$group":
+      {
         "_id": null,
         points: {
           $sum: "$nbPoints"
@@ -247,7 +248,7 @@ exports.getRankings = async function() {
   // Get delegations ranking
   tmp = await delegations.getIncomingRanking("steem-plus");
   let globalProperties = await steem.api.getDynamicGlobalPropertiesAsync()
-  .then(function(values) 
+  .then(function(values)
   {
     totalSteem = Number(values.total_vesting_fund_steem.split(" ")[0]);
     totalVests = Number(values.total_vesting_shares.split(" ")[0]);
