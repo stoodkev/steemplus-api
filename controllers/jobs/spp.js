@@ -36,6 +36,7 @@ exports.weeklyRewards = async function(startWeek, endWeek) {
   const delegationType = await TypeTransaction.findOne({"name": "Delegation"});
   const reblogType = await TypeTransaction.findOne({"name": "Reblog"});
   const weeklyRewardType = await TypeTransaction.findOne({"name": "Weekly Reward"});
+  const premiumType = await TypeTransaction.findOne({"name": "Premium Feature"});
 
   // Rewards for top 10
   // Ex :
@@ -47,7 +48,7 @@ exports.weeklyRewards = async function(startWeek, endWeek) {
 
   // MongoDB query creation for ranking
   const weeklyQuery = [
-    { "$match": { "typeTransaction": { $nin: [delegationType._id, reblogType._id, weeklyRewardType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
+    { "$match": { "typeTransaction": { $nin: [delegationType._id, reblogType._id, weeklyRewardType._id,premiumType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
     { "$group":
       {
         "_id": "$user",
@@ -278,7 +279,6 @@ exports.payDelegations = async function() {
       .sort(function(a, b) {
         return b.timestamp - a.timestamp;
       })[0].vesting_shares;
-    console.log(previousDelegation);
     // Look for minimum delegation of the last 24 hours not last one
     currentDelegation = delegations[delegator]
       .filter(
@@ -303,7 +303,6 @@ exports.payDelegations = async function() {
       let weekly = 0;
       let hasCanceledDelegation = false;
       let i = 0;
-      console.log("start new 7 days period from " + date);
       // We decided to pay delegation every 7 days
       // User can get a reward if he delegated for 7 days in a row.
       for (i; i < 7; i++) {
@@ -393,7 +392,6 @@ exports.payDelegations = async function() {
           requestType: 3
         });
         pointsDetail = await pointsDetail.save();
-        console.log("saved");
         // Update user account
         user.pointsDetails.push(pointsDetail);
         user.nbPoints = user.nbPoints + nbPoints;
@@ -519,7 +517,7 @@ async function updateSteemplusPointsTransfers(transfers) {
     promises.push(utils.getPurchaseInfoSM(requestId));
   }
 
-  Promise.all(promises).then(async function(values) {
+    const values= await Promise.all(promises);
     let steemMonstersRequestUser = {};
     for (let i = 0; i < values.length; i++) {
       steemMonstersRequestUser[values[i].requestId] = values[i].player;
@@ -673,11 +671,11 @@ async function updateSteemplusPointsTransfers(transfers) {
       }
 
       if (type === null) {
-        console.log("refused type");
+        //console.log("refused type");
         continue;
       }
       if (reason !== null) {
-        console.log("refused reason : " + reason);
+        //console.log("refused reason : " + reason);
         continue;
       }
       // Check if user is already in DB
@@ -747,7 +745,6 @@ async function updateSteemplusPointsTransfers(transfers) {
       nbPointDetailsAdded++;
     }
     console.log(`Added ${nbPointDetailsAdded} pointDetail(s)`);
-  });
 }
 
 // Function used to process the data from SteemSQL for requestType == 4
@@ -961,8 +958,6 @@ exports.updateSteemplusPoints = async function() {
       `);
       })
       .then(async function(result){
-        console.log("fetching transfers3");
-
         await updateSteemplusPointsTransfers(result.recordsets[0]);
         sql.close();
       })

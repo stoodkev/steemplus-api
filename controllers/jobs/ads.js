@@ -36,13 +36,13 @@ exports.add = async function() {
           )`
       );
     })
-    .then(result => {
+    .then(async result => {
       console.log(result);
       const newAds=result.recordsets[0];
       for (ad of newAds){
         // if ad fits the criteria, create a new campaign
         if(isAcceptable(ad)){
-          ads.create(ad);
+          await ads.create(ad);
         }
         else {
           console.log(ad.memo+" does not fit criteria");

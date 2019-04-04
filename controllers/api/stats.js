@@ -33,7 +33,7 @@ exports.getSppStats = async function() {
     doc.name = doc._id;
     doc._id = doc.origId;
     doc.points = doc.points.toFixed(3);
-    doc.rank=index;
+    doc.rank=index+1;
     delete doc._id;
     return doc;
   });
@@ -61,7 +61,7 @@ exports.getSppStats = async function() {
     doc.name = a.accountName;
     doc._id = doc.origId;
     doc.points = doc.points.toFixed(3);
-    doc.rank=index;
+    doc.rank=index+1;
     delete doc._id;
     return doc;
   });
