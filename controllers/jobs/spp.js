@@ -959,7 +959,11 @@ exports.updateSteemplusPoints = async function() {
       })
       .then(async function(result){
         // get SPP from transfers
+        try{
         await updateSteemplusPointsTransfers(result.recordsets[0]);
+      } catch(e){
+        console.log(e);
+      }
         sql.close();
       })
       .catch(error => {
