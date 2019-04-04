@@ -4,7 +4,7 @@ const routes = require("./routes/routes.js");
 const apiRoutes = require("./routes/api/apiRoutes.js");
 const sppRoutes = require("./routes/api/sppRoutes.js");
 const jobsRoutes = require("./routes/jobs/jobsRoutes.js");
-const replay = require("./routes/jobs/replay.js");
+const replay = require("./routes/api/replay.js");
 const statsRoutes = require("./routes/api/statsRoutes.js");
 const adsRoutes = require("./routes/api/adsRoutes.js");
 const app = express();
@@ -49,7 +49,7 @@ mongoose.connect(
 );
 
 routes(app);
-replay(app);
+replay.route(app);
 apiRoutes(app);
 jobsRoutes(app);
 sppRoutes(app);

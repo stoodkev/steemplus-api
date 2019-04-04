@@ -63,12 +63,12 @@ const replay = function(app) {
     console.log("Done loading ads");
     console.log("Done replaying");
     replayStarted = false;
-    //TODO: Stop other jobs during replay
   });
-
-  function hasReplayStarted(){
-    return replayStarted;
-  }
 }
 
-module.exports = replay;
+const hasReplayStarted = function(){
+    return replayStarted;
+}
+
+module.exports.route = replay;
+module.exports.hasReplayStarted=hasReplayStarted;

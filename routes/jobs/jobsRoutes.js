@@ -6,8 +6,8 @@ const premium = require("../../controllers/jobs/premium.js");
 const steemplusPay = require("../../controllers/jobs/steemplusPay.js");
 const ads = require("../../controllers/jobs/ads.js");
 const utils = require("../../utils.js");
+const replay=require("../api/replay.js")
 const steem = require("steem");
-
 const VOTING_ACCOUNT = "steem-plus";
 const ADS_FEE=25;
 let payDelegationsStarted = false;
@@ -26,7 +26,7 @@ const jobRoutes = function(app) {
       res.status(403).send("Permission denied");
       return;
     }
-    if(payDelegationsStarted) {
+    if(payDelegationsStarted||replay.hasReplayStarted()) {
       res.status(403).send("Pay delegation already started");
       return;
     }
@@ -41,7 +41,7 @@ const jobRoutes = function(app) {
       res.status(403).send("Permission denied");
       return;
     }
-    if(growStarted) {
+    if(growStarted||replay.hasReplayStarted()) {
       res.status(403).send("Grow already started");
       return;
     }
@@ -58,7 +58,7 @@ const jobRoutes = function(app) {
       res.status(403).send("Permission denied");
       return;
     }
-    if(weeklyRewardsStarted) {
+    if(weeklyRewardsStarted||replay.hasReplayStarted()) {
       res.status(403).send("Weekly rewards already started");
       return;
     }
@@ -77,7 +77,7 @@ const jobRoutes = function(app) {
       res.status(403).send("Permission denied");
       return;
     }
-    if(updateSteemplusPointsStarted) {
+    if(updateSteemplusPointsStarted||replay.hasReplayStarted()) {
       res.status(403).send("Update Steemplus Points already started");
       return;
     }
@@ -94,7 +94,7 @@ const jobRoutes = function(app) {
       res.status(403).send("Permission denied");
       return;
     }
-    if(botVoteStarted) {
+    if(botVoteStarted||replay.hasReplayStarted()) {
       res.status(403).send("Bot vote already started");
       return;
     }
@@ -145,7 +145,7 @@ const jobRoutes = function(app) {
       res.status(403).send("Permission denied");
       return;
     }
-    if(postStatsStarted) {
+    if(postStatsStarted||replay.hasReplayStarted()) {
       res.status(403).send("Post Stats already started");
       return;
     }
@@ -161,7 +161,7 @@ const jobRoutes = function(app) {
       res.status(403).send("Permission denied");
       return;
     }
-    if(debitPremiumStarted) {
+    if(debitPremiumStarted||replay.hasReplayStarted()) {
       res.status(403).send("Debit premium already started");
       return;
     }
@@ -177,7 +177,7 @@ const jobRoutes = function(app) {
       res.status(403).send("Permission denied");
       return;
     }
-    if(newAdsStarted) {
+    if(newAdsStarted||replay.hasReplayStarted()) {
       res.status(403).send("New Ads Job already started");
       return;
     }
