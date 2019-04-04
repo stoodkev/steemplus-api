@@ -16,6 +16,7 @@ exports.create = async function(ad) {
     const imgPost=rex.exec(result.body);
     const image=imgPost ? imgPost[0] : "no_img";
     const title=result.title;
+    // Save new ads in the database
     const ads=new Ads({
       permlink:permlink,
       author:author,

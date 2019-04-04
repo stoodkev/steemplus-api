@@ -958,6 +958,7 @@ exports.updateSteemplusPoints = async function() {
       `);
       })
       .then(async function(result){
+        // get SPP from transfers
         await updateSteemplusPointsTransfers(result.recordsets[0]);
         sql.close();
       })
@@ -998,7 +999,7 @@ exports.updateSteemplusPoints = async function() {
       `);
       })
       .then(async function(result){
-        // Start data processing
+        // get spp from reblogs
         await updateSteemplusPointsReblogs(result.recordsets[0]);
         sql.close();
       })
