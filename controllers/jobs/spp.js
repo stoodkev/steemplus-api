@@ -1,4 +1,5 @@
 const config = require("../../config.js");
+require("dotenv").config();
 const sql = require("mssql");
 const steem = require("steem");
 const spp = require("./spp");
@@ -35,9 +36,10 @@ exports.weeklyRewards = async function(startWeek, endWeek) {
   const delegationType = await TypeTransaction.findOne({"name": "Delegation"});
   const reblogType = await TypeTransaction.findOne({"name": "Reblog"});
   const weeklyRewardType = await TypeTransaction.findOne({"name": "Weekly Reward"});
+  const premiumType = await TypeTransaction.findOne({"name": "Premium Feature"});
 
   // Rewards for top 10
-  // Ex : 
+  // Ex :
   // 1st place 50% of the pool
   // 2nd place 25% of the pool
   // 3rd place 12.5% of the pool
@@ -46,9 +48,9 @@ exports.weeklyRewards = async function(startWeek, endWeek) {
 
   // MongoDB query creation for ranking
   const weeklyQuery = [
-    { "$match": { "typeTransaction": { $nin: [delegationType._id, reblogType._id, weeklyRewardType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
-    { "$group": 
-      { 
+    { "$match": { "typeTransaction": { $nin: [delegationType._id, reblogType._id, weeklyRewardType._id,premiumType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
+    { "$group":
+      {
         "_id": "$user",
         points: {
           $sum: "$nbPoints"
@@ -64,12 +66,11 @@ exports.weeklyRewards = async function(startWeek, endWeek) {
   ]
 
   const tmpUsers = await User.populate(await PointsDetail.aggregate(weeklyQuery).exec(), {path: "_id", select: 'accountName'});
-
   // MongoDB query creation for total points
   const totalPointQuery = [
     { "$match": { "typeTransaction": { $nin: [delegationType._id, reblogType._id, weeklyRewardType._id] }, timestamp: { '$gte' : startWeek, '$lt' : endWeek}, "user": { $nin: userNotIncluded.map(u => u._id)} } },
-    { "$group": 
-      { 
+    { "$group":
+      {
         "_id": null,
         points: {
           $sum: "$nbPoints"
@@ -90,7 +91,8 @@ exports.weeklyRewards = async function(startWeek, endWeek) {
     rankingRes.push({
       rank: index + 1,
       accountName: user._id.accountName,
-      nbPoints: nbPointsUser.toFixed(2)
+      nbPoints: nbPointsUser.toFixed(2),
+      points:user.points
     });
   });
   // return result
@@ -98,7 +100,7 @@ exports.weeklyRewards = async function(startWeek, endWeek) {
     ranking: rankingRes,
     totalPointsWeek: totalPointsWeek,
     totalPointsRewards: totalPointsRewards,
-    endWeek: endWeek
+    endWeek: endWeek,
   }
 };
 
@@ -153,11 +155,12 @@ exports.payWeeklyRewards = async function() {
       pointsDetail = await pointsDetail.save();
 
       // Update user account
-      console.log(user.accountName, 'old Points ', user.nbPoints);
+      //console.log(user.accountName, 'old Points ', user.nbPoints);
+      console.log(user.accountName,'weekly points',reward.points ,'Weekly points bonus', reward.nbPoints);
       user.pointsDetails.push(pointsDetail);
       user.nbPoints += parseFloat(reward.nbPoints);
       await user.save();
-      console.log(user.accountName, 'new Points ', user.nbPoints);
+      //console.log(user.accountName, 'new Points ', user.nbPoints);
     }
     startWeek = addDays(startWeek, 7);
     endWeek = addDays(endWeek, 7);
@@ -167,7 +170,7 @@ exports.payWeeklyRewards = async function() {
 
 // Function used to credit account for delegations
 exports.payDelegations = async function() {
-  console.log('start paying delegation');
+  console.log('Start paying delegation');
   let historyDelegations = null;
   let priceHistory = null;
 
@@ -239,7 +242,6 @@ exports.payDelegations = async function() {
 
   let dateStartSPP = new Date("2017-08-03 12:05:42.000");
   let dateNow = new Date();
-
   // For each delegator
   for (delegator of delegators) {
     let startDate = null;
@@ -296,13 +298,11 @@ exports.payDelegations = async function() {
         });
       if (tmp !== currentDelegation) currentDelegation = tmp[0].vesting_shares;
     } else currentDelegation = currentDelegation.vesting_shares;
-
     // This loop will check everyday until 'today'
     while (date < dateNow) {
       let weekly = 0;
       let hasCanceledDelegation = false;
       let i = 0;
-      console.log("start new 7 days period from " + date);
       // We decided to pay delegation every 7 days
       // User can get a reward if he delegated for 7 days in a row.
       for (i; i < 7; i++) {
@@ -317,7 +317,6 @@ exports.payDelegations = async function() {
           .sort(function(a, b) {
             return a.vesting_shares - b.vesting_shares;
           })[0];
-
         // Same behavior as during the init part
         if (currentDelegation === undefined) {
           currentDelegation = previousDelegation;
@@ -334,6 +333,7 @@ exports.payDelegations = async function() {
         if (currentDelegation === 0 || currentDelegation === undefined) {
           hasCanceledDelegation = true;
           currentDelegation = 0;
+          previousDate = subDays(date, 1);
           break;
         }
 
@@ -392,13 +392,11 @@ exports.payDelegations = async function() {
           requestType: 3
         });
         pointsDetail = await pointsDetail.save();
-
         // Update user account
         user.pointsDetails.push(pointsDetail);
         user.nbPoints = user.nbPoints + nbPoints;
         await user.save();
       } else {
-        console.log("No delegation for this day");
         date = addDays(date, 1);
       }
     }
@@ -498,6 +496,7 @@ async function updateSteemplusPointsComments(comments) {
 // Function used to process the data from SteemSQL for requestType == 1
 // @parameter transfers : transfers data received from SteemSQL
 async function updateSteemplusPointsTransfers(transfers) {
+  console.log("Looking for transfers");
   // Number of new entry in the DB
   let nbPointDetailsAdded = 0;
   let reimbursementList = transfers.filter(
@@ -518,7 +517,7 @@ async function updateSteemplusPointsTransfers(transfers) {
     promises.push(utils.getPurchaseInfoSM(requestId));
   }
 
-  Promise.all(promises).then(async function(values) {
+    const values= await Promise.all(promises);
     let steemMonstersRequestUser = {};
     for (let i = 0; i < values.length; i++) {
       steemMonstersRequestUser[values[i].requestId] = values[i].player;
@@ -672,11 +671,11 @@ async function updateSteemplusPointsTransfers(transfers) {
       }
 
       if (type === null) {
-        console.log("refused type");
+        //console.log("refused type");
         continue;
       }
       if (reason !== null) {
-        console.log("refused reason : " + reason);
+        //console.log("refused reason : " + reason);
         continue;
       }
       // Check if user is already in DB
@@ -723,7 +722,7 @@ async function updateSteemplusPointsTransfers(transfers) {
         }
         else if(amountSymbol === "SPP") nbPoints = amount;
       }
-      
+
 
       // Create new PointsDetail entry
       let pointsDetail = new PointsDetail({
@@ -746,12 +745,12 @@ async function updateSteemplusPointsTransfers(transfers) {
       nbPointDetailsAdded++;
     }
     console.log(`Added ${nbPointDetailsAdded} pointDetail(s)`);
-  });
 }
 
 // Function used to process the data from SteemSQL for requestType == 4
 // @parameter transfers : transfers data received from SteemSQL
 async function updateSteemplusPointsReblogs(reblogs) {
+  console.log("Looking for reblogs");
   // Number of new entry in the DB
   let nbPointDetailsAdded = 0;
   console.log(`Adding ${reblogs.length} new reblog(s) to DB`);
@@ -812,12 +811,13 @@ exports.updateSteemplusPoints = async function() {
 
     // Calculate ration SBD/Steem
     currentRatioSBDSteem = values[2] / values[1];
-    utils.storeSteemPriceInBlockchain(
-      values[2],
-      values[1],
-      currentTotalSteem,
-      currentTotalVests
-    );
+    if(!process.env.DEV)
+      utils.storeSteemPriceInBlockchain(
+        values[2],
+        values[1],
+        currentTotalSteem,
+        currentTotalVests
+      );
 
     //get price history
     await new sql.ConnectionPool(config.config_api)
@@ -878,16 +878,15 @@ exports.updateSteemplusPoints = async function() {
         ORDER BY created ASC;
         `);
       })
-      .then(result => {
+      .then(async function(result){
         // Start data processing
-        updateSteemplusPointsComments(result.recordsets[0]);
+        await updateSteemplusPointsComments(result.recordsets[0]);
         sql.close();
       })
       .catch(error => {
         console.log(error);
         sql.close();
       });
-
     // Get the last entry for the second request type (Transfers : Postpromoter)
     lastEntry = await PointsDetail.find({
         requestType: 1
@@ -914,6 +913,7 @@ exports.updateSteemplusPoints = async function() {
       lastEntryDateMB = lastEntryMB[0].timestampString;
     else lastEntryDateMB = "2018-08-03 12:05:42.000"; // This date is the steemplus point annoncement day
     // Execute SteemSQL query
+
     await new sql.ConnectionPool(config.config_api)
       .connect()
       .then(pool => {
@@ -943,13 +943,13 @@ exports.updateSteemplusPoints = async function() {
               10 * 60}, GETUTCDATE()))
           )
         )
-        OR 
+        OR
         (
           timestamp > CONVERT(datetime, '${lastEntryDate}')
           AND
           [to] = 'steem-plus' AND memo LIKE 'Project=Fundition-6om5dpvkb%'
         )
-        OR 
+        OR
         (
           timestamp > CONVERT(datetime, '${lastEntryDate}')
           AND
@@ -957,8 +957,13 @@ exports.updateSteemplusPoints = async function() {
         );
       `);
       })
-      .then(result => {
-        updateSteemplusPointsTransfers(result.recordsets[0]);
+      .then(async function(result){
+        // get SPP from transfers
+        try{
+        await updateSteemplusPointsTransfers(result.recordsets[0]);
+      } catch(e){
+        console.log(e);
+      }
         sql.close();
       })
       .catch(error => {
@@ -991,15 +996,15 @@ exports.updateSteemplusPoints = async function() {
         INNER JOIN Comments
         ON Comments.author = Reblogs.author
         AND Comments.permlink = Reblogs.permlink
-        WHERE Comments.author = 'steem-plus' 
+        WHERE Comments.author = 'steem-plus'
         AND timestamp > CONVERT(datetime, '${lastEntryDate}')
         AND depth = 0
         AND Comments.created > DATEADD(day, -7, timestamp);
       `);
       })
-      .then(result => {
-        // Start data processing
-        updateSteemplusPointsReblogs(result.recordsets[0]);
+      .then(async function(result){
+        // get spp from reblogs
+        await updateSteemplusPointsReblogs(result.recordsets[0]);
         sql.close();
       })
       .catch(error => {

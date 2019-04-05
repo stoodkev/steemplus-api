@@ -4,7 +4,9 @@ const routes = require("./routes/routes.js");
 const apiRoutes = require("./routes/api/apiRoutes.js");
 const sppRoutes = require("./routes/api/sppRoutes.js");
 const jobsRoutes = require("./routes/jobs/jobsRoutes.js");
+const replay = require("./routes/api/replay.js");
 const statsRoutes = require("./routes/api/statsRoutes.js");
+const adsRoutes = require("./routes/api/adsRoutes.js");
 const app = express();
 require("dotenv").config();
 const RateLimit = require("express-rate-limit");
@@ -31,7 +33,7 @@ app.use(express.static('public'));
 const uristring =
   process.env.MONGOLAB_PINK_URI ||
   process.env.MONGODB_URI ||
-  "mongodb://127.0.0.1:27017/heroku_fl6ldd26";
+  "mongodb://localhost:27017/steemplus-api";
 mongoose.connect(
   uristring,
   function(err, res) {
@@ -47,7 +49,9 @@ mongoose.connect(
 );
 
 routes(app);
+replay.route(app);
 apiRoutes(app);
 jobsRoutes(app);
 sppRoutes(app);
 statsRoutes(app);
+adsRoutes(app);
