@@ -78,7 +78,7 @@ exports.getPostStats = async function () {
         author: author,
         permlink: permlink,
         max_accepted_payout: '100000.000 SBD',
-        percent_steem_dollars: 10000,
+        percent_steem_dollars: 0,
         allow_votes: true,
         allow_curation_rewards: true,
         extensions: [
