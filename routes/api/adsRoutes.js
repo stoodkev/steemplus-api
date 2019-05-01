@@ -7,6 +7,10 @@ const apiRouter = function(app) {
     res.status(200).send(await ads.getAds());
   });
 
+  app.get("/ads-whitelist", async function(req, res) {
+    res.status(200).send(await ads.getAdsWhitelist());
+  });
+
   // Creating an ad campaign via a POST method
   app.post("/ads", async function(req, res) {
     if (req.body.key !== config.key) {

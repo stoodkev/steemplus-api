@@ -1,9 +1,14 @@
 const Ads = require("../../models/ads.js");
+const AdsWhitelist = require("../../models/ads_whitelist.js");
 const steem = require("steem");
 
 // Show list of ads
 exports.getAds = async function() {
   	return await Ads.find({date:{$gte:new Date(Date.now()-7*24*3600*1000)}});
+}
+
+exports.getAdsWhitelist = async function() {
+  	return await AdsWhitelist.find({},{username:1,_id:0});
 }
 
 // Create new Ads
