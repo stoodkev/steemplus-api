@@ -30,10 +30,12 @@ const apiRouter = function(app) {
   });
 
   app.get("/bittrex", async function(req, res) {
-    console.log("hi");
     res.status(200).send(await bittrex.getValues());
   });
 
+  app.get("/ticker/:code", async function(req, res) {
+    res.status(200).send(await bittrex.getTicker(req.params.code));
+  });
   // Get all the received witness votes for a given user. Includes proxified votes
   // @parameter @username : username
   app.get("/received-witness-votes/:username", async function(req, res) {

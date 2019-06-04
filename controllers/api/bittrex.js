@@ -1,12 +1,18 @@
 const config = require("../../config");
 const req=require("request");
 exports.getValues = async() => {
-  console.log("hello");
   const steem=await getSteemPrice();
   const btc=await getBTCPrice();
   const sbd=await getSBDPrice();
-  console.log({btc:btc,steem:steem,sbd:sbd});
   return {btc:btc,steem:steem,sbd:sbd};
+};
+
+exports.getTicker = async(code) => {
+  return new Promise((fulfill)=>{
+    req({url:"https://widgets.coinmarketcap.com/v2/ticker/"+code+"/?ref=widget&convert=USD",json:true},function(err,http,body){
+      fulfill(body);
+    });
+  });
 };
 
 async function getSteemPrice(){
