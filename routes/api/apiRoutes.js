@@ -3,6 +3,7 @@ const witnesses = require("../../controllers/api/witnesses.js");
 const delegations = require("../../controllers/api/delegations.js");
 const wallet = require("../../controllers/api/wallet.js");
 const rewards = require("../../controllers/api/rewards.js");
+const bittrex = require("../../controllers/api/bittrex.js");
 const reblogs = require("../../controllers/api/reblogs.js");
 const followers = require("../../controllers/api/followers.js");
 const blocks = require("../../controllers/api/blocks.js");
@@ -26,6 +27,11 @@ const apiRouter = function(app) {
   // No parameter!
   app.get("/witnesses-ranks", async function(req, res) {
     res.status(200).send(await witnesses.getWitnessesRank());
+  });
+
+  app.get("/bittrex", async function(req, res) {
+    console.log("hi");
+    res.status(200).send(await bittrex.getValues());
   });
 
   // Get all the received witness votes for a given user. Includes proxified votes
