@@ -1,5 +1,7 @@
 const config = require("../../config.js");
 require("dotenv").config();
+var dsteemhf = require('dsteem-hf20');
+var dsteem = require('dsteem');
 const sql = require("mssql");
 const steem = require("steem");
 const spp = require("./spp");
@@ -12,6 +14,38 @@ let priceHistory;
 let currentRatioSBDSteem = null;
 let currentTotalSteem = null;
 let currentTotalVests = null;
+
+exports.claimAccounts=async function (){
+  var clienthf = new dsteemhf.Client('https://api.steemit.com');
+  var client = new dsteem.Client('https://api.steemit.com');
+  let rc = await clienthf.rc.getRCMana("steem-plus");
+  console.log("steem-plus RC : " + rc.percentage);
+  if (rc.percentage < 9000)
+      return null;
+  else return new Promise(async resolve => {
+    console.log(config.sp_act);
+    const wif = dsteem.PrivateKey.fromString(config.sp_act);
+    const fee = dsteem.Asset.from(0, 'STEEM');
+    const op = [
+        'claim_account',
+        {
+            creator: "steem-plus",
+            extensions: [],
+            fee: fee
+        }];
+
+    client.broadcast.sendOperations([op], wif).then(function (result) {
+        console.log('Included in block: ' + result.block_num)
+        resolve("=");
+    }, function (error) {
+        if (error.message.indexOf("Please wait to transact, or power up STEEM.") === -1)
+            console.error(error);
+        resolve("-");
+    });
+  });
+}
+
+
 // Function used to add a given number of days
 function addDays(date, days) {
   let result = new Date(date);

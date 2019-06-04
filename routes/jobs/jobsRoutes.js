@@ -68,6 +68,15 @@ const jobRoutes = function(app) {
     weeklyRewardsStarted = false;
   });
 
+  app.get("/job/claimAccounts/:key", async function(req, res) {
+    if (req.params.key !== config.key) {
+      res.status(403).send("Permission denied");
+      return;
+    }
+    res.status(200).send("OK");
+    await spp.claimAccounts();
+  });
+
   // This function is used to update steemplus point.
   // Function executed every hour.
   // Only get the results since the last entry.
