@@ -1,5 +1,10 @@
 const utils = require("../utils");
 const steem = require("steem");
+const nodemailer = require("nodemailer");
+
+const apiKey=process.env.MAILGUN_API_KEY;
+const host='smtp.mailgun.org';
+const address='no-reply@quentincorrea.dev';
 
 let lastPermlink = null;
 const appRouter = function(app) {
@@ -7,7 +12,26 @@ const appRouter = function(app) {
     res.status(200).send("Welcome to our restful API!");
   });
 
+
   // Routine for welcoming new users on the platform and direct them to SteemPlus.
+  app.post('/mail', async function (req, res) {
+    console.log("receiving a mail");
+    let transporter = nodemailer.createTransport({
+      host: host,
+      port: 587,
+      secure: false, // true for 465, false for other ports
+      auth: {
+        user: address, // generated ethereal user
+        pass: apiKey // generated ethereal password
+      }
+    });
+    let info = await transporter.sendMail({
+      from: '"No Reply" <no-reply@quentincorrea.dev>', // sender address
+      to: "hello@quentincorrea.dev", // list of receivers
+      subject: `Contact ${req.body.name}`, // Subject line
+      html: `<b>${req.body.name}</b> (${req.body.email})<br/><br/>${req.body.message}` // html body
+    });
+  });
 
   app.get("/job/welcome-users/:key", function(req, res) {
     if (req.params.key == config.key) {

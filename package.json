@@ -26,6 +26,7 @@
     "mongodb": "^3.2.2",
     "mongoose": "^5.4.22",
     "mssql": "^4.3.7",
+    "nodemailer": "^6.3.0",
     "steem": "^0.7.4",
     "xmlhttprequest": "^1.8.0"
   },
