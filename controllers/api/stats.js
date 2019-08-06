@@ -40,7 +40,7 @@ exports.getSppStats = async function() {
 
   const points_per_user_day = [
     {
-      $match: { timestamp: { $gt: new Date(Date.now() - 31*24 * 60 * 60 * 1000) } }
+      $match: { timestamp: { $gt: new Date(Date.now() - 24 * 60 * 60 * 1000) } }
     },
     {
       $group: {
@@ -98,7 +98,7 @@ exports.getSppStats = async function() {
 
   const points_per_transaction_day = [
     {
-      $match: { timestamp: { $gt: new Date(Date.now() - 31*24 * 60 * 60 * 1000) } }
+      $match: { timestamp: { $gt: new Date(Date.now() - 24 * 60 * 60 * 1000) } }
     },
     {
       $group: {
