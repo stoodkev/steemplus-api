@@ -24,7 +24,7 @@
     "jsdom": "^12.2.0",
     "moment": "^2.24.0",
     "mongodb": "^3.2.2",
-    "mongoose": "^5.4.22",
+    "mongoose": "^5.7.5",
     "mssql": "^4.3.7",
     "steem": "^0.7.4",
     "xmlhttprequest": "^1.8.0"
