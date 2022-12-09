@@ -14,7 +14,7 @@
     "dotenv": "^5.0.1",
     "dsteem": "^0.11.2",
     "dsteem-hf20": "^0.10.9",
-    "express": "^4.16.4",
+    "express": "^4.17.3",
     "express-rate-limit": "^2.14.2",
     "fs": "0.0.1-security",
     "get-json": "^1.0.1",
